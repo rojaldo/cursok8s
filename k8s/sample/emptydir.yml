@@ -1,0 +1,35 @@
+# persistent volume claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ubuntu-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+---
+# pod with interactive ubuntu container and persistent volume claim
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu-interactive
+spec:
+  containers:
+  - name: ubuntu
+    image: ubuntu:latest
+    command: ["/bin/bash", "-c", "tail -f /dev/null"]
+    volumeMounts:
+    - name: data-volume
+      mountPath: /data
+    stdin: true
+    tty: true
+  volumes:
+  # emptyDir volume
+  - name: data-volume
+    emptyDir: {}
+
+    # to connect to the pod
+    # kubectl exec -it ubuntu-interactive -- /bin/bash

@@ -1,0 +1,190 @@
+= Comandos Básicos de Bash
+
+== Comandos básicos de Bash
+
+1. `ls`: Lista los archivos y directorios en el directorio actual.
+   - Ejemplo: `ls -l`
+
+2. `cd`: Cambia el directorio actual.
+   - Ejemplo: `cd /home/usuario`
+
+3. `pwd`: Muestra la ruta del directorio actual.
+   - Ejemplo: `pwd`
+
+4. `cp`: Copia archivos o directorios.
+   - Ejemplo: `cp archivo1.txt archivo2.txt`
+
+5. `mv`: Mueve o renombra archivos o directorios.
+   - Ejemplo: `mv archivo.txt /nuevo_directorio/`
+
+6. `rm`: Elimina archivos o directorios.
+   - Ejemplo: `rm archivo.txt`
+
+7. `mkdir`: Crea un nuevo directorio.
+   - Ejemplo: `mkdir nuevo_directorio`
+
+8. `rmdir`: Elimina un directorio vacío.
+   - Ejemplo: `rmdir directorio_vacio`
+
+9. `touch`: Crea un nuevo archivo vacío o actualiza la fecha de modificación de un archivo existente.
+   - Ejemplo: `touch archivo.txt`
+
+10. `echo`: Muestra un mensaje en la terminal.
+    - Ejemplo: `echo "Hola, mundo"`
+
+== Comandos de visualización y manipulación de archivos
+
+1. `cat`: Muestra el contenido de un archivo.
+    - Ejemplo: `cat archivo.txt`
+
+2. `more`: Muestra el contenido de un archivo de manera paginada.
+    - Ejemplo: `more archivo.txt`
+
+3. `less`: Similar a `more`, pero con más funciones.
+    - Ejemplo: `less archivo.txt`
+
+4. `head`: Muestra las primeras líneas de un archivo.
+    - Ejemplo: `head archivo.txt`
+
+5. `tail`: Muestra las últimas líneas de un archivo.
+    - Ejemplo: `tail archivo.txt`
+
+6. `grep`: Busca texto en archivos.
+    - Ejemplo: `grep "palabra" archivo.txt`
+
+7. `find`: Busca archivos y directorios en una jerarquía de directorios.
+    - Ejemplo: `find /ruta -name "archivo.txt"`
+
+8. `wc`: Cuenta líneas, palabras y caracteres en archivos.
+    - Ejemplo: `wc archivo.txt`
+
+9. `sort`: Ordena líneas de texto en archivos.
+    - Ejemplo: `sort archivo.txt`
+
+10. `uniq`: Elimina líneas duplicadas en un archivo ordenado.
+    - Ejemplo: `uniq archivo.txt`
+
+11. `cut`: Extrae secciones de líneas de texto.
+    - Ejemplo: `cut -d: -f1 archivo.txt`
+
+12. `sed`: Edita archivos de texto.
+    - Ejemplo: `sed 's/palabra1/palabra2/' archivo.txt`
+
+13. `awk`: Procesa y analiza archivos de texto.
+    - Ejemplo: `awk '{print $1}' archivo.txt`
+
+14. `diff`: Compara archivos línea por línea.
+    - Ejemplo: `diff archivo1.txt archivo2.txt`
+
+== Comandos de gestión del sistema
+
+1. `ps`: Muestra información sobre los procesos en ejecución.
+    - Ejemplo: `ps aux`
+
+2. `top`: Muestra en tiempo real los procesos más activos del sistema.
+    - Ejemplo: `top`
+
+3. `kill`: Termina procesos usando su ID.
+    - Ejemplo: `kill 1234`
+
+4. `chmod`: Cambia los permisos de archivos o directorios.
+    - Ejemplo: `chmod +x script.sh`
+
+5. `chown`: Cambia el propietario de archivos o directorios.
+    - Ejemplo: `chown usuario:grupo archivo.txt`
+
+6. `df`: Muestra información sobre el espacio en disco.
+    - Ejemplo: `df -h`
+
+7. `du`: Muestra el uso de espacio en disco de archivos y directorios.
+    - Ejemplo: `du -h archivo_o_directorio`
+
+8. `mount`: Monta sistemas de archivos.
+    - Ejemplo: `mount /dev/sdb1 /mnt`
+
+9. `umount`: Desmonta sistemas de archivos.
+    - Ejemplo: `umount /mnt`
+
+10. `shutdown`: Apaga o reinicia el sistema.
+    - Ejemplo: `shutdown -h now`
+
+== Comandos de red
+
+1. `ping`: Envía paquetes ICMP ECHO_REQUEST a un host.
+    - Ejemplo: `ping www.google.com`
+
+2. `ifconfig`: Muestra o configura interfaces de red (obsoleto en algunas distribuciones, reemplazado por `ip`).
+    - Ejemplo: `ifconfig`
+
+3. `ip`: Muestra o configura interfaces de red y rutas.
+    - Ejemplo: `ip addr`
+
+4. `netstat`: Muestra conexiones de red, tablas de enrutamiento, estadísticas de interfaz, etc.
+    - Ejemplo: `netstat -tuln`
+
+5. `scp`: Copia archivos entre hosts de manera segura.
+    - Ejemplo: `scp archivo.txt usuario@host:/ruta`
+
+6. `ssh`: Inicia una sesión remota segura.
+    - Ejemplo: `ssh usuario@host`
+
+7. `curl`: Realiza transferencias de datos desde o hacia un servidor.
+    - Ejemplo: `curl http://www.example.com`
+
+8. `wget`: Descarga archivos de la web.
+    - Ejemplo: `wget http://www.example.com/archivo.zip`
+
+9. `traceroute`: Muestra la ruta que toma un paquete a través de la red.
+    - Ejemplo: `traceroute www.google.com`
+
+10. `nslookup`: Realiza consultas DNS.
+    - Ejemplo: `nslookup www.google.com`
+
+11. `dig`: Realiza consultas DNS avanzadas.
+    - Ejemplo: `dig www.google.com`
+
+12. `route`: Muestra o configura la tabla de enrutamiento.
+    - Ejemplo: `route -n`
+
+== Comandos de compresión y archivo
+
+1. `tar`: Archiva varios archivos en un solo archivo tar.
+    - Ejemplo: `tar -czvf archivo.tar.gz /ruta/a/archivos`
+
+2. `zip`: Comprime archivos en un archivo zip.
+    - Ejemplo: `zip archivo.zip archivo1 archivo2`
+
+3. `unzip`: Extrae archivos de un archivo zip.
+    - Ejemplo: `unzip archivo.zip`
+
+4. `gzip`: Comprime archivos.
+    - Ejemplo: `gzip archivo.txt`
+
+5. `gunzip`: Descomprime archivos comprimidos con gzip.
+    - Ejemplo: `gunzip archivo.txt.gz`
+
+== Otros comandos útiles
+
+1. `alias`: Crea alias para comandos.
+    - Ejemplo: `alias ll='ls -la'`
+
+2. `history`: Muestra el historial de comandos utilizados.
+    - Ejemplo: `history`
+
+3. `clear`: Limpia la terminal.
+    - Ejemplo: `clear`
+
+4. `date`: Muestra o establece la fecha y hora del sistema.
+    - Ejemplo: `date`
+
+5. `whoami`: Muestra el nombre del usuario actual.
+    - Ejemplo: `whoami`
+
+6. `uptime`: Muestra el tiempo de actividad del sistema.
+    - Ejemplo: `uptime`
+
+7. `man`: Muestra el manual de usuario de un comando.
+    - Ejemplo: `man ls`
+
+8. `which`: Muestra la ruta de un comando.
+    - Ejemplo: `which ls`

@@ -1,0 +1,180 @@
+= Guía para usar contenedores de Docker con interfaz gráfica
+
+.Métodos posibles:
+* Enviar X11 a través de SSH
+* Usar VNC
+
+## Enviar X11 a través de SSH
+
+Necesitamos asegurarnos de que tenemos dos opciones en el archivo de configuración de sshd. Este archivo casi siempre se encuentra en /etc/ssh/sshd_config. Es recomendable hacer una copia del archivo original con cp antes de modificarlo. Luego, podemos imponer las opciones con cualquier editor de texto.
+
+.En la consola del host, ejecutamos:
+
+```bash
+$ sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.original
+$ sudo nano /etc/ssh/sshd_config
+```
+
+.Tenemos que modificar las siguientes líneas:
+
+```
+X11Forwarding yes
+X11UseLocalhost no
+```
+
+Tambíen necesitamos abrir el puerto de las X en la interfaz virtual de Docker. Por defecto, el servidor X del host escucha solo en lo. La mejor opción es permitir solo conexiones locales desde los puertos de Docker con xhost:
+
+```bash
+$ sudo xhost +local:docker
+```
+
+.Otra opción es permitir conexiones desde cualquier IP, pero esto es menos seguro:
+```bash
+$ sudo xhost +
+```
+
+.Es posible que necesitemos reiniciar el servicio sshd:
+
+```bash
+$ sudo service sshd restart
+```
+
+.Creamos el siguiente Dockerfile:
+
+```Dockerfile
+FROM ubuntu
+RUN apt-get update && apt-get install -qqy x11-apps
+CMD xeyes
+```
+
+.Construimos la imagen:
+
+```bash
+$ docker build -t sample:latest .
+```
+
+.Ejecutamos el contenedor:
+
+```bash
+$ docker run --rm -it --net=host --env DISPLAY=$DISPLAY sample:latest
+```
+
+### Problemas que pueden surgir
+Cuando el contenedor se está ejecutando, necesita acceder al archivo .Xauthority para conectarse al servidor. Este archivo está relacionado con xhost y es sensible al nombre del host. Podemos dar a los contenedores diferentes nombres de host en Docker y encontrarnos con errores.
+
+.La primera solución es montar el archivo .Xauthority y el socket X11 en el contenedor:
+
+```bash
+$ docker run --rm -it --net=host --env DISPLAY=$DISPLAY --volume $HOME/.Xauthority:/root/.Xauthority --volume /tmp/.X11-unix:/tmp/.X11-unix sample:latest
+```
+
+Por defecto, el usuario del contenedor tiene el mismo UID que el usuario del host. Cuando ejecutamos la aplicación GUI en el contenedor, comprueba si hay una cookie en el archivo .Xauthority que coincida con el nombre y $DISPLAY del host. Una vez encontrado, el cliente pasa la solicitud a través del socket /tmp/.X11-unix montado en el contenedor.
+
+.La segunda solución es usar el mismo nombre de host para el contenedor y el host. Esto se puede hacer con la opción --hostname:
+
+```bash
+$ docker run --rm -it --net=host --env DISPLAY=$DISPLAY --hostname $HOSTNAME sample:latest
+```
+
+.La tercera solución es usar .Xauthority para poder tener un nombre usuario diferente:
+Es posible que tengamos errores si hay diferentes usuarios creando y usando el contenedor. Aún podemos solucionar esto escribiendo el archivo .Xauthority para que el nombre de host no importe al verificar la entrada de la cookie.
+
+.Para hacer esto, necesitamos instalar xauth en el host y en el contenedor. Luego, podemos ejecutar el siguiente comando en el host:
+
+```bash
+$ touch /tmp/.docker.xauth
+$ xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f /tmp/.docker.xauth nmerge - 
+```
+
+.Luego, podemos ejecutar el contenedor con el siguiente comando:
+
+```bash
+$ sudo docker run --rm -it --net=host --volume /tmp/.docker.xauth:/tmp/.docker.xauth --volume /tmp/.X11-unix:/tmp/.X11-unix --env DISPLAY=$DISPLAY --env XAUTHORITY=/tmp/.docker.xauth ssh_image_tag_1 
+```
+
+## Usar x11vnc
+
+Otra forma de ejecutar aplicaciones GUI en contenedores es usar x11vnc. Este método es más fácil de configurar y más seguro que el anterior. Sin embargo, es más lento y no es compatible con todas las aplicaciones.
+
+.Creamos el siguiente Dockerfile:
+
+```Dockerfile
+FROM ubuntu:latest
+RUN apt-get update && apt-get install -qqy x11-apps x11vnc xvfb
+RUN mkdir ~/.vnc 
+RUN x11vnc -storepasswd 1234 ~/.vnc/passwd 
+CMD xeyes
+```
+
+.Construimos la imagen:
+
+```bash
+$ docker build -t sample:latest .
+```
+
+.Ejecutamos el contenedor (es posible que necesitemos permisos de root):
+
+```bash
+$ docker run --rm -p 5900:5900 --env HOME=/ ssh_image_tag_2 x11vnc -create
+```
+
+Ahora deberíamos poder conectarnos al contenedor con cualquier cliente VNC a través del puerto 5900 que está expuesto en el host. Pero no podemos, porque la aplicación x11vnc no se ha instalado en las dependencias de la imagen. Al parecer, en la versión 18.10 de Ubuntu, x11vnc se instalaba con estas dependencia, pero no en las versiones actuales.
+
+Podemos encontrar la solución en el siguiente repositorio de GitHub:
+https://github.com/bandi13/gui-docker
+
+Podemos ver en el Dockerfile que se instala el servidor TigerVNC aparte de net-tools, python y numpy 
+
+.El Dockerfile quedaría así:
+
+```Dockerfile
+FROM    ubuntu:22.04
+
+# for the VNC connection
+EXPOSE 5900
+# for the browser VNC client
+EXPOSE 5901
+# Use environment variable to allow custom VNC passwords
+ENV VNC_PASSWD=123456
+
+# Make sure the dependencies are met
+ENV APT_INSTALL_PRE="apt -o Acquire::ForceIPv4=true update && DEBIAN_FRONTEND=noninteractive apt -o Acquire::ForceIPv4=true install -y --no-install-recommends"
+ENV APT_INSTALL_POST="&& apt clean -y && rm -rf /var/lib/apt/lists/*"
+# Make sure the dependencies are met
+RUN eval ${APT_INSTALL_PRE} tigervnc-standalone-server tigervnc-common tigervnc-tools fluxbox eterm xterm git net-tools python3 python3-numpy ca-certificates scrot ${APT_INSTALL_POST}
+
+# Install VNC. Requires net-tools, python and python-numpy
+RUN git clone --branch v1.4.0 --single-branch https://github.com/novnc/noVNC.git /opt/noVNC
+RUN git clone --branch v0.11.0 --single-branch https://github.com/novnc/websockify.git /opt/noVNC/utils/websockify
+RUN ln -s /opt/noVNC/vnc.html /opt/noVNC/index.html
+
+# Add menu entries to the container
+RUN echo "?package(bash):needs=\"X11\" section=\"DockerCustom\" title=\"Xterm\" command=\"xterm -ls -bg black -fg white\"" >> /usr/share/menu/custom-docker && update-menus
+
+# Set timezone to UTC
+RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo UTC > /etc/timezone
+
+# Add in a health status
+HEALTHCHECK --start-period=10s CMD bash -c "if [ \"`pidof -x Xtigervnc | wc -l`\" == "1" ]; then exit 0; else exit 1; fi"
+
+# Add in non-root user
+ENV UID_OF_DOCKERUSER 1000
+RUN useradd -m -s /bin/bash -g users -u ${UID_OF_DOCKERUSER} dockerUser
+RUN chown -R dockerUser:users /home/dockerUser && chown dockerUser:users /opt
+
+USER dockerUser
+
+# Copy various files to their respective places
+COPY --chown=dockerUser:users container_startup.sh /opt/container_startup.sh
+COPY --chown=dockerUser:users x11vnc_entrypoint.sh /opt/x11vnc_entrypoint.sh
+# Subsequent images can put their scripts to run at startup here
+RUN mkdir /opt/startup_scripts
+
+ENTRYPOINT ["/opt/container_startup.sh"]
+```
+
+.Para arrancar el contenedor:
+
+```bash
+docker run --shm-size=256m -it -p 5901:5901 -e VNC_PASSWD=123456 bandi13/gui-docker
+```

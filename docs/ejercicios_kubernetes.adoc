@@ -1,0 +1,219 @@
+== Ejercicios con Pods en Kubernetes
+
+1. Crea un manifiesto YAML para desplegar un pod simple que ejecute la imagen oficial de Nginx y exponga el puerto 80. Verifica que el pod esté en estado Running.
+
+2. Despliega un pod que ejecute una aplicación Python personalizada desde una imagen de Docker Hub y define una variable de entorno dentro del pod.
+
+3. Crea un pod que monte un volumen de tipo `emptyDir` y escribe un archivo dentro del volumen desde el contenedor principal.
+
+4. Define un pod con dos contenedores (sidecar pattern): uno ejecutando una aplicación Node.js y otro un contenedor de logs que monitorice los archivos generados por la aplicación.
+
+5. Despliega un pod que utilice un ConfigMap para cargar la configuración de la aplicación como variables de entorno.
+
+6. Crea un pod que monte un Secret como archivo en un directorio específico del contenedor y accede a su contenido desde la aplicación.
+
+7. Define un pod que limite el uso de CPU y memoria de su contenedor principal, y verifica que los límites se aplican correctamente.
+
+8. Despliega un pod que ejecute un comando personalizado al iniciar (por ejemplo, un script de inicialización) y mantén el pod en ejecución tras finalizar el script.
+
+9. Crea un pod que utilice una sonda de liveness y otra de readiness para controlar el ciclo de vida del contenedor, simulando fallos para observar el comportamiento de Kubernetes.
+
+10. Despliega un pod que utilice una imagen privada de Docker Hub, configurando las credenciales necesarias mediante un Secret de tipo `docker-registry`.
+
+== Ejercicios con ReplicaSets en Kubernetes
+
+1. Crea un manifiesto YAML para desplegar un ReplicaSet que gestione 3 réplicas de un contenedor basado en la imagen oficial de Nginx. Verifica que el ReplicaSet mantiene el número de pods si alguno falla o es eliminado manualmente.
+
+2. Modifica el manifiesto de un ReplicaSet existente para aumentar el número de réplicas de 3 a 5 y observa cómo Kubernetes crea los pods adicionales automáticamente.
+
+3. Despliega un ReplicaSet que gestione varias réplicas de una aplicación Node.js y utiliza un selector de etiquetas personalizado para asociar los pods al ReplicaSet.
+
+4. Elimina manualmente un pod gestionado por un ReplicaSet y comprueba que el ReplicaSet crea un nuevo pod para mantener el estado deseado.
+
+5. Crea un ReplicaSet que utilice una estrategia de actualización manual: elimina el ReplicaSet y observa cómo se eliminan todos los pods asociados.
+
+6. Define un ReplicaSet que utilice una imagen personalizada de Docker Hub y exponga un puerto específico. Verifica que todos los pods creados por el ReplicaSet están accesibles en el clúster.
+
+7. Modifica el selector de un ReplicaSet para que solo gestione pods con una etiqueta específica y comprueba el comportamiento al cambiar las etiquetas de los pods existentes.
+
+8. Despliega un ReplicaSet con una política de recursos (CPU y memoria) definida para cada pod y verifica que los límites se aplican correctamente.
+
+9. Crea un ReplicaSet que gestione pods con variables de entorno definidas y verifica que cada pod recibe la configuración adecuada.
+
+10. Realiza un ejercicio donde elimines el ReplicaSet pero dejes los pods huérfanos (`orphan pods`) usando la opción `--cascade=orphan` y analiza el resultado en el clúster.
+
+== Ejercicios con Deployments en Kubernetes
+
+1. Crea un manifiesto YAML para desplegar un Deployment que gestione 3 réplicas de una aplicación basada en la imagen oficial de Nginx. Verifica que el Deployment mantiene el número de pods y permite actualizaciones controladas.
+
+2. Modifica el Deployment anterior para actualizar la imagen de Nginx a una versión más reciente y observa cómo Kubernetes realiza el rolling update sin interrumpir el servicio.
+
+3. Define un Deployment que utilice variables de entorno y monta un ConfigMap como archivo de configuración dentro de los pods.
+
+4. Crea un Deployment para una aplicación Node.js que exponga el puerto 3000 y limite el uso de CPU y memoria de cada pod.
+
+5. Implementa un Deployment con una estrategia de actualización `Recreate` y observa el comportamiento de los pods durante una actualización de la imagen.
+
+6. Despliega un Deployment que utilice un Secret para inyectar credenciales sensibles como variables de entorno en los pods.
+
+7. Configura un Deployment con una sonda de liveness y otra de readiness, y simula fallos para observar cómo Kubernetes gestiona la disponibilidad de los pods.
+
+8. Crea un Deployment que utilice afinidad de nodos (`nodeAffinity`) para programar los pods solo en nodos con una etiqueta específica.
+
+9. Escala un Deployment de 2 a 6 réplicas usando el comando `kubectl scale` y verifica que el servicio sigue disponible durante el escalado.
+
+10. Elimina un Deployment y comprueba que todos los pods gestionados por él también se eliminan automáticamente del clúster.
+
+== Ejercicios con StatefulSets en Kubernetes
+
+1. Crea un manifiesto YAML para desplegar un StatefulSet con 3 réplicas de una base de datos MongoDB, asegurando que cada pod tenga un volumen persistente independiente y nombres estables.
+
+2. Despliega un StatefulSet de Redis configurado en modo cluster, utilizando un Headless Service para permitir la comunicación directa entre los pods.
+
+3. Modifica el número de réplicas de un StatefulSet en ejecución y observa cómo Kubernetes crea o elimina pods manteniendo el orden y la identidad de cada uno.
+
+4. Crea un StatefulSet para una aplicación que requiera almacenamiento persistente, definiendo un PersistentVolumeClaim por cada pod y verificando que los datos persisten tras reinicios o recreaciones de pods.
+
+5. Implementa un StatefulSet que utilice un Init Container para preparar el entorno antes de iniciar el contenedor principal en cada pod.
+
+6. Despliega un StatefulSet con una política de actualización `RollingUpdate` y realiza una actualización de la imagen, observando el orden en que se actualizan los pods.
+
+7. Configura un StatefulSet para una aplicación que necesite acceder a un volumen compartido de solo lectura, además de su volumen persistente individual.
+
+8. Crea un StatefulSet que utilice variables de entorno únicas para cada pod, aprovechando las variables de ordinal index (`statefulset-0`, `statefulset-1`, etc.) en la configuración.
+
+9. Elimina uno de los pods de un StatefulSet y verifica que Kubernetes lo recrea con el mismo nombre y volumen persistente asociado.
+
+10. Despliega un StatefulSet con una sonda de readiness personalizada y simula fallos para observar cómo Kubernetes gestiona la disponibilidad y el reemplazo de los pods.
+
+== Ejercicios con DaemonSets en Kubernetes
+
+1. Crea un manifiesto YAML para desplegar un DaemonSet que ejecute un agente de monitoreo (por ejemplo, Prometheus Node Exporter) en todos los nodos del clúster y verifica que se crea un pod por nodo.
+
+2. Modifica el DaemonSet anterior para que solo se ejecute en nodos con una etiqueta específica (`nodeSelector`), excluyendo los nodos que no cumplan el criterio.
+
+3. Despliega un DaemonSet que monte un volumen del host (`hostPath`) en cada pod para recopilar logs del sistema y verifica que los pods acceden correctamente a los archivos del host.
+
+4. Crea un DaemonSet que utilice tolerancias (`tolerations`) para ejecutarse también en nodos taintados, como los nodos reservados para tareas especiales.
+
+5. Implementa un DaemonSet que utilice una política de actualización `RollingUpdate` y observa cómo se actualizan los pods de forma controlada en todos los nodos.
+
+6. Despliega un DaemonSet que inyecte variables de entorno específicas en cada pod, como el nombre del nodo donde se ejecuta, utilizando la funcionalidad de Downward API.
+
+7. Crea un DaemonSet que utilice un Init Container para preparar el entorno antes de iniciar el contenedor principal en cada nodo.
+
+8. Configura un DaemonSet para desplegar un agente de red (por ejemplo, Flannel o Calico) en todos los nodos y verifica la conectividad de red entre los pods del clúster.
+
+9. Elimina manualmente un pod gestionado por un DaemonSet y comprueba que Kubernetes lo recrea automáticamente en el mismo nodo.
+
+10. Despliega un DaemonSet con una sonda de liveness personalizada y simula fallos para observar cómo Kubernetes gestiona la recuperación de los pods en los nodos afectados.
+
+== Ejercicios con Jobs y CronJobs en Kubernetes
+
+1. Crea un manifiesto YAML para desplegar un Job que ejecute una tarea simple, como imprimir "Hola Kubernetes" en la salida estándar, y verifica que el Job finaliza correctamente.
+
+2. Despliega un Job que ejecute un script de copia de archivos entre dos volúmenes montados en el pod y comprueba que los archivos se copian correctamente.
+
+3. Crea un Job que realice varios intentos de ejecución (`completions`) y configure el número máximo de pods paralelos (`parallelism`) para observar cómo Kubernetes gestiona la concurrencia.
+
+4. Define un Job que falle intencionadamente (por ejemplo, ejecutando un comando inexistente) y configura el número de reintentos (`backoffLimit`) antes de que Kubernetes marque el Job como fallido.
+
+5. Despliega un Job que procese una lista de tareas utilizando la funcionalidad de `Indexed Jobs`, asignando una tarea diferente a cada pod según su índice.
+
+6. Crea un CronJob que ejecute un script de respaldo de base de datos cada hora y almacene los archivos generados en un volumen persistente.
+
+7. Configura un CronJob que imprima la fecha y hora actual cada minuto y verifica que los pods se crean y eliminan automáticamente según la programación.
+
+8. Despliega un CronJob con una política de retención (`successfulJobsHistoryLimit` y `failedJobsHistoryLimit`) para controlar cuántos Jobs completados y fallidos se mantienen en el clúster.
+
+9. Crea un CronJob que utilice variables de entorno para parametrizar el comportamiento del script ejecutado y verifica que los valores se aplican correctamente en cada ejecución.
+
+10. Implementa un Job que utilice un Init Container para preparar datos antes de ejecutar la tarea principal y verifica que la secuencia de ejecución es la esperada.
+
+== Ejercicios con ConfigMaps y Secrets en Kubernetes
+
+1. Crea un ConfigMap a partir de un archivo de configuración local y monta su contenido como archivo dentro de un pod. Verifica que la aplicación lee correctamente la configuración desde el archivo montado.
+
+2. Despliega un pod que utilice variables de entorno definidas en un ConfigMap y comprueba que la aplicación accede a los valores correctamente.
+
+3. Crea un Secret de tipo genérico con credenciales de base de datos y monta el Secret como archivo en un directorio específico del contenedor.
+
+4. Modifica el manifiesto de un Deployment para que utilice un Secret como variables de entorno sensibles (por ejemplo, usuario y contraseña) y verifica que no aparecen en texto plano en los logs del pod.
+
+5. Crea un ConfigMap que contenga múltiples claves y monta solo una de ellas como archivo en un pod, dejando las demás disponibles como variables de entorno.
+
+6. Despliega un pod que utilice tanto un ConfigMap como un Secret, montando ambos como archivos en diferentes rutas del sistema de archivos del contenedor.
+
+7. Actualiza el valor de una clave en un ConfigMap y observa cómo los pods que lo utilizan reaccionan al cambio (por ejemplo, reiniciando el pod o recargando la configuración).
+
+8. Crea un Secret de tipo `docker-registry` para acceder a una imagen privada en Docker Hub y úsalo en el manifiesto de un pod para permitir la descarga de la imagen.
+
+9. Implementa un ConfigMap que almacene un script de inicialización y haz que un Init Container lo ejecute antes de lanzar la aplicación principal.
+
+10. Despliega un Deployment que utilice un ConfigMap para definir la configuración de la aplicación y un Secret para las credenciales, montando ambos como archivos y variables de entorno en los pods.
+
+== Ejercicios con Servicios en Kubernetes
+
+1. Crea un manifiesto YAML para desplegar un Service de tipo ClusterIP que exponga una aplicación web en el clúster y verifica que los pods pueden comunicarse a través del servicio.
+
+2. Despliega un Service de tipo NodePort para una aplicación backend y accede a la aplicación desde fuera del clúster utilizando la IP del nodo y el puerto asignado.
+
+3. Crea un Service de tipo LoadBalancer (simulado con Minikube o en un entorno cloud) para exponer una aplicación al exterior y verifica que el tráfico se distribuye entre los pods disponibles.
+
+4. Define un Service que seleccione pods mediante etiquetas personalizadas y comprueba que solo los pods con esas etiquetas reciben tráfico.
+
+5. Modifica el selector de un Service existente para cambiar el conjunto de pods a los que enruta el tráfico y observa el efecto en la disponibilidad de la aplicación.
+
+6. Despliega un Headless Service para una base de datos StatefulSet y verifica que cada pod obtiene un DNS único para la comunicación directa entre réplicas.
+
+7. Crea un Service que exponga múltiples puertos (por ejemplo, HTTP y HTTPS) y verifica que ambos puertos están accesibles desde otros pods del clúster.
+
+8. Implementa un Service sin selector y crea un Endpoints manualmente para enrutar el tráfico a una IP externa o a un servicio fuera del clúster.
+
+9. Configura un Service con una política de afinidad de sesión (`sessionAffinity: ClientIP`) y comprueba que las peticiones sucesivas desde el mismo cliente llegan siempre al mismo pod.
+
+10. Elimina un Service y verifica que los pods siguen funcionando, pero ya no son accesibles a través del nombre DNS del servicio.
+
+== Ejercicios con Ingress en Kubernetes
+
+1. Crea un manifiesto YAML para desplegar un recurso Ingress que enrute el tráfico HTTP hacia un servicio backend expuesto en el clúster. Verifica que puedes acceder a la aplicación a través del dominio definido en el Ingress.
+
+2. Configura un Ingress con múltiples reglas de host, de modo que diferentes dominios apunten a distintos servicios dentro del clúster. Comprueba que cada dominio enruta correctamente al servicio correspondiente.
+
+3. Despliega un Ingress que utilice reglas de path para enrutar peticiones a diferentes servicios según la ruta solicitada (por ejemplo, `/api` y `/web`).
+
+4. Implementa un Ingress con TLS habilitado, generando un Secret con un certificado autofirmado y configurando el Ingress para servir tráfico seguro (HTTPS).
+
+5. Crea un Ingress que utilice anotaciones para habilitar la reescritura de URLs, de modo que las peticiones a `/app` se redirijan internamente a `/`.
+
+6. Configura un Ingress con autenticación básica (Basic Auth) utilizando un Secret y verifica que solo los usuarios autenticados pueden acceder al servicio.
+
+7. Despliega un Ingress que limite el acceso a ciertos paths o hosts mediante una lista blanca de direcciones IP (whitelist).
+
+8. Implementa un Ingress que utilice reglas de redirección, por ejemplo, redirigiendo automáticamente las peticiones HTTP a HTTPS.
+
+9. Crea un Ingress que utilice anotaciones para configurar límites de tasa de peticiones (rate limiting) y comprueba el comportamiento bajo carga.
+
+10. Despliega un Ingress Controller alternativo (por ejemplo, Traefik o Contour) y crea un recurso Ingress compatible, verificando que el tráfico se enruta correctamente a los servicios definidos.
+
+== Ejercicios con Volúmenes en Kubernetes
+
+1. Crea un manifiesto YAML para desplegar un pod que monte un volumen de tipo `emptyDir` y escribe datos temporales en él. Verifica que los datos se eliminan al eliminar el pod.
+
+2. Despliega un pod que utilice un volumen de tipo `hostPath` para acceder a un directorio del nodo anfitrión y comprueba que los archivos creados en el pod aparecen en el host.
+
+3. Crea un Deployment que monte un volumen de tipo `configMap` como archivo de configuración y verifica que la aplicación lee correctamente el archivo desde el volumen.
+
+4. Despliega un StatefulSet que utilice un PersistentVolumeClaim (PVC) por cada pod y comprueba que los datos persisten tras reiniciar o recrear los pods.
+
+5. Crea un pod que monte un Secret como archivo en un volumen y verifica que la aplicación puede leer el contenido del Secret desde el sistema de archivos.
+
+6. Implementa un pod que utilice un volumen de tipo `nfs` para compartir archivos entre varios pods y verifica que los cambios realizados por un pod son visibles para los demás.
+
+7. Despliega un Deployment que utilice un volumen de tipo `persistentVolumeClaim` y realiza una copia de seguridad de los datos almacenados en el volumen usando un Job.
+
+8. Crea un pod que monte varios volúmenes de diferentes tipos (por ejemplo, `emptyDir`, `configMap` y `secret`) y verifica que la aplicación accede correctamente a cada uno.
+
+9. Despliega un pod que utilice un volumen proyectado (`projected volume`) para combinar datos de un ConfigMap y un Secret en un solo punto de montaje.
+
+10. Crea un StatefulSet que utilice volúmenes persistentes con políticas de retención (`Retain`) y verifica que los datos no se eliminan al borrar los pods o el StatefulSet.

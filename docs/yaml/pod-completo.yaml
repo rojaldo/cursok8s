@@ -1,0 +1,422 @@
+# ============================================================================
+# POD DE KUBERNETES - EJEMPLO COMPLETO CON TODOS LOS APARTADOS
+# ============================================================================
+# Un Pod es la unidad más pequeña y básica de despliegue en Kubernetes.
+# Representa uno o más contenedores que comparten red, almacenamiento y contexto.
+# ============================================================================
+
+# Versión de la API de Kubernetes
+apiVersion: v1
+
+# Tipo de recurso
+kind: Pod
+
+# ============================================================================
+# METADATA: Información de identificación del Pod
+# ============================================================================
+metadata:
+  # Nombre único del Pod en el namespace
+  name: mi-pod
+  
+  # Namespace donde se creará el Pod
+  namespace: default
+  
+  # Labels para organizar y seleccionar el Pod
+  labels:
+    app: mi-app
+    version: "1.0"
+    environment: production
+    tier: backend
+  
+  # Annotations para metadata adicional
+  annotations:
+    description: "Pod de ejemplo con configuración completa"
+    contact: "devops@empresa.com"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+
+# ============================================================================
+# SPEC: Especificación del Pod
+# ============================================================================
+spec:
+  # ========================================================================
+  # CONTENEDORES: Lista de contenedores que se ejecutarán en el Pod
+  # ========================================================================
+  containers:
+  - name: contenedor-principal
+    
+    # Imagen del contenedor
+    image: nginx:1.21-alpine
+    
+    # Política de descarga de imagen
+    imagePullPolicy: IfNotPresent
+    
+    # Comando y argumentos
+    command: ["/bin/sh"]
+    args: ["-c", "nginx -g 'daemon off;'"]
+    
+    # Directorio de trabajo
+    workingDir: /app
+    
+    # Puertos expuestos
+    ports:
+    - name: http
+      containerPort: 80
+      protocol: TCP
+    - name: https
+      containerPort: 443
+      protocol: TCP
+    
+    # Variables de entorno
+    env:
+    - name: ENVIRONMENT
+      value: "production"
+    - name: POD_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    - name: POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+    - name: SECRET_VALUE
+      valueFrom:
+        secretKeyRef:
+          name: mi-secret
+          key: password
+    
+    # Cargar variables desde ConfigMap/Secret
+    envFrom:
+    - configMapRef:
+        name: mi-configmap
+    - secretRef:
+        name: mi-secret
+    
+    # Recursos
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+    
+    # Liveness Probe
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: 80
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 3
+      successThreshold: 1
+      failureThreshold: 3
+    
+    # Readiness Probe
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: 80
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    
+    # Startup Probe
+    startupProbe:
+      httpGet:
+        path: /startup
+        port: 80
+      initialDelaySeconds: 0
+      periodSeconds: 10
+      failureThreshold: 30
+    
+    # Lifecycle hooks
+    lifecycle:
+      postStart:
+        exec:
+          command: ["/bin/sh", "-c", "echo 'Contenedor iniciado'"]
+      preStop:
+        exec:
+          command: ["/bin/sh", "-c", "nginx -s quit"]
+    
+    # Montaje de volúmenes
+    volumeMounts:
+    - name: data
+      mountPath: /data
+    - name: config
+      mountPath: /etc/config
+      readOnly: true
+    - name: secrets
+      mountPath: /etc/secrets
+      readOnly: true
+    
+    # Contexto de seguridad
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 3000
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - NET_BIND_SERVICE
+      seccompProfile:
+        type: RuntimeDefault
+    
+    # Terminal
+    stdin: false
+    stdinOnce: false
+    tty: false
+  
+  # Contenedor sidecar
+  - name: log-collector
+    image: fluent/fluent-bit:2.0
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+    volumeMounts:
+    - name: logs
+      mountPath: /var/log
+  
+  # ========================================================================
+  # INIT CONTAINERS: Contenedores de inicialización
+  # ========================================================================
+  initContainers:
+  - name: init-myservice
+    image: busybox:1.35
+    command: ['sh', '-c', 'until nslookup myservice; do echo waiting; sleep 2; done']
+  
+  # ========================================================================
+  # VOLÚMENES
+  # ========================================================================
+  volumes:
+  # EmptyDir
+  - name: data
+    emptyDir: {}
+  
+  # EmptyDir en memoria
+  - name: cache
+    emptyDir:
+      medium: Memory
+      sizeLimit: 128Mi
+  
+  # ConfigMap
+  - name: config
+    configMap:
+      name: mi-configmap
+      defaultMode: 0644
+  
+  # Secret
+  - name: secrets
+    secret:
+      secretName: mi-secret
+      defaultMode: 0400
+  
+  # PersistentVolumeClaim
+  - name: persistent-storage
+    persistentVolumeClaim:
+      claimName: mi-pvc
+  
+  # HostPath
+  - name: host-data
+    hostPath:
+      path: /var/data
+      type: DirectoryOrCreate
+  
+  # Logs compartidos
+  - name: logs
+    emptyDir: {}
+  
+  # ========================================================================
+  # CONFIGURACIÓN DE RED Y DNS
+  # ========================================================================
+  
+  # Política DNS
+  dnsPolicy: ClusterFirst
+  
+  # Configuración DNS personalizada
+  dnsConfig:
+    nameservers:
+    - 8.8.8.8
+    searches:
+    - default.svc.cluster.local
+    options:
+    - name: ndots
+      value: "2"
+  
+  # Hostname y subdomain
+  hostname: mi-hostname
+  subdomain: mi-subdomain
+  
+  # Usar red del host
+  hostNetwork: false
+  hostPID: false
+  hostIPC: false
+  
+  # ========================================================================
+  # SERVICE ACCOUNT Y SEGURIDAD
+  # ========================================================================
+  
+  serviceAccountName: mi-service-account
+  automountServiceAccountToken: true
+  
+  # Contexto de seguridad a nivel de Pod
+  securityContext:
+    fsGroup: 2000
+    fsGroupChangePolicy: "OnRootMismatch"
+    supplementalGroups: [3000]
+    runAsUser: 1000
+    runAsGroup: 3000
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+    sysctls:
+    - name: net.ipv4.ip_local_port_range
+      value: "1024 65535"
+  
+  # ========================================================================
+  # SCHEDULING Y PLACEMENT
+  # ========================================================================
+  
+  # Selector de nodos
+  nodeSelector:
+    disktype: ssd
+    environment: production
+  
+  # Nombre del nodo específico
+  # nodeName: worker-node-1
+  
+  # Afinidad
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/zone
+            operator: In
+            values:
+            - us-east-1a
+            - us-east-1b
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: node-type
+            operator: In
+            values:
+            - high-performance
+    
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: app
+            operator: In
+            values:
+            - cache
+        topologyKey: kubernetes.io/hostname
+    
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: mi-app
+          topologyKey: kubernetes.io/hostname
+  
+  # Tolerations
+  tolerations:
+  - key: "node.kubernetes.io/not-ready"
+    operator: "Exists"
+    effect: "NoExecute"
+    tolerationSeconds: 300
+  - key: "dedicated"
+    operator: "Equal"
+    value: "database"
+    effect: "NoSchedule"
+  
+  # Prioridad
+  priorityClassName: high-priority
+  
+  # Distribución de topología
+  topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app: mi-app
+  
+  # ========================================================================
+  # POLÍTICAS
+  # ========================================================================
+  
+  # Política de reinicio: Always, OnFailure, Never
+  restartPolicy: Always
+  
+  # Tiempo de gracia para terminación
+  terminationGracePeriodSeconds: 30
+  
+  # Deadline activo del Pod
+  activeDeadlineSeconds: 3600
+  
+  # Política de preempción
+  preemptionPolicy: PreemptLowerPriority
+  
+  # ========================================================================
+  # CONFIGURACIÓN DE RUNTIME
+  # ========================================================================
+  
+  # Clase de runtime
+  runtimeClassName: kata
+  
+  # Overhead
+  overhead:
+    memory: "20Mi"
+    cpu: "10m"
+  
+  # ========================================================================
+  # OTRAS CONFIGURACIONES
+  # ========================================================================
+  
+  # Secretos para pull de imágenes
+  imagePullSecrets:
+  - name: regcred
+  
+  # Habilitar service links
+  enableServiceLinks: true
+  
+  # Compartir proceso namespace
+  shareProcessNamespace: false
+  
+  # Hostname como FQDN
+  setHostnameAsFQDN: false
+  
+  # Sistema operativo
+  os:
+    name: linux
+  
+  # Readiness gates
+  readinessGates:
+  - conditionType: "example.com/custom-ready"
+
+# ============================================================================
+# STATUS: Estado del Pod (solo lectura, gestionado por Kubernetes)
+# ============================================================================
+# status:
+#   phase: Running
+#   conditions: [...]
+#   hostIP: 192.168.1.10
+#   podIP: 10.244.1.5
+#   startTime: 2025-10-27T10:00:00Z
+#   containerStatuses: [...]
+
+# ============================================================================
+# FIN DEL POD
+# ============================================================================

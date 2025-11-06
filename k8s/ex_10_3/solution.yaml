@@ -1,0 +1,32 @@
+# configmap that contains several configuration settings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_PORT: "8080"
+---
+
+# ubuntu interactive pod that mounts configmap as environment variables
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu-interactive-2
+spec:
+  containers:
+  - name: ubuntu
+    image: ubuntu:latest
+    command: ["/bin/bash", "-c", "tail -f /dev/null"]
+    volumeMounts:
+    - name: data-volume
+      mountPath: /data
+    stdin: true
+    tty: true
+  volumes:
+  - name: data-volume
+    configMap:
+      name: app-config
+  restartPolicy: Never
+---

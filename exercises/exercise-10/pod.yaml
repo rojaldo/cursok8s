@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: private-image-pod
+  labels:
+    app: private-image-demo
+spec:
+  containers:
+  - name: private-app
+    # IMPORTANTE: Reemplaza esto con tu imagen privada de Docker Hub
+    # Formato: username/repository:tag
+    image: YOUR_USERNAME/YOUR_PRIVATE_IMAGE:latest
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "Successfully pulled private image!"
+        echo "Application running..."
+        sleep 3600
+  imagePullSecrets:
+  - name: docker-registry-secret

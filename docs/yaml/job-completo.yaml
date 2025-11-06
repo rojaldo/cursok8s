@@ -1,0 +1,778 @@
+# ============================================================================
+# JOB DE KUBERNETES - EJEMPLO COMPLETO CON TODOS LOS APARTADOS
+# ============================================================================
+# Un Job crea uno o más Pods y garantiza que un número específico de ellos
+# se complete exitosamente. Ideal para tareas batch, procesamientos únicos,
+# migraciones, backups, etc.
+# ============================================================================
+
+# Versión de la API
+apiVersion: batch/v1
+
+# Tipo de recurso
+kind: Job
+
+# ============================================================================
+# METADATA: Información de identificación del Job
+# ============================================================================
+metadata:
+  # Nombre único del Job
+  name: mi-job-procesamiento
+  
+  # Namespace
+  namespace: default
+  
+  # Labels del Job
+  labels:
+    app: procesamiento-datos
+    type: batch
+    category: etl
+    version: v1
+  
+  # Annotations
+  annotations:
+    description: "Job para procesar datos diarios"
+    contact: "data-team@empresa.com"
+    schedule: "manual"
+    estimated-duration: "30m"
+
+# ============================================================================
+# SPEC: Especificación del Job
+# ============================================================================
+spec:
+  # ========================================================================
+  # COMPLETIONS: Número de completaciones exitosas requeridas
+  # ========================================================================
+  # Cuántos Pods deben completarse exitosamente para que el Job se considere completo
+  # - Si no se especifica, por defecto es 1
+  # - El Job creará Pods hasta alcanzar este número de completaciones
+  completions: 5
+  
+  # ========================================================================
+  # PARALLELISM: Número de Pods ejecutándose en paralelo
+  # ========================================================================
+  # Cuántos Pods pueden ejecutarse simultáneamente
+  # - Si no se especifica, por defecto es 1
+  # - Debe ser <= completions
+  # - Ejemplo: completions=10, parallelism=2 → ejecuta 2 Pods a la vez hasta completar 10
+  parallelism: 2
+  
+  # ========================================================================
+  # BACKOFF LIMIT: Límite de reintentos
+  # ========================================================================
+  # Número de reintentos antes de marcar el Job como fallido
+  # - Por defecto es 6
+  # - Cuenta fallos de Pods, no reintentos de contenedores
+  backoffLimit: 4
+  
+  # ========================================================================
+  # BACKOFF LIMIT PER INDEX
+  # ========================================================================
+  # Límite de reintentos por índice (Kubernetes 1.28+)
+  # Solo aplica cuando completionMode es Indexed
+  # backoffLimitPerIndex: 3
+  
+  # ========================================================================
+  # MAX FAILED INDEXES
+  # ========================================================================
+  # Número máximo de índices fallidos permitidos (Kubernetes 1.28+)
+  # Solo aplica cuando completionMode es Indexed
+  # maxFailedIndexes: 5
+  
+  # ========================================================================
+  # ACTIVE DEADLINE SECONDS
+  # ========================================================================
+  # Tiempo máximo en segundos que el Job puede estar activo
+  # - Si se excede, el Job se termina y se marca como fallido
+  # - Útil para evitar Jobs que se ejecutan indefinidamente
+  activeDeadlineSeconds: 3600  # 1 hora
+  
+  # ========================================================================
+  # TTL SECONDS AFTER FINISHED
+  # ========================================================================
+  # Tiempo en segundos después del cual el Job se elimina automáticamente
+  # tras completarse o fallar
+  # - Útil para limpiar Jobs antiguos automáticamente
+  # - Si no se especifica, el Job no se elimina automáticamente
+  ttlSecondsAfterFinished: 86400  # 24 horas
+  
+  # ========================================================================
+  # COMPLETION MODE
+  # ========================================================================
+  # Modo de completación del Job (Kubernetes 1.22+)
+  # - NonIndexed (default): Pods no tienen índice, trabajo no estructurado
+  # - Indexed: Cada Pod tiene un índice único (0 hasta completions-1)
+  #   Útil para procesamiento paralelo de trabajo particionado
+  completionMode: NonIndexed
+  
+  # ========================================================================
+  # SUSPEND
+  # ========================================================================
+  # Suspender el Job (Kubernetes 1.21+)
+  # - true: suspende el Job (no crea nuevos Pods)
+  # - false: Job activo normal
+  suspend: false
+  
+  # ========================================================================
+  # POD FAILURE POLICY
+  # ========================================================================
+  # Política personalizada de manejo de fallos (Kubernetes 1.25+)
+  podFailurePolicy:
+    rules:
+    # Ignorar fallos con exit code específico
+    - action: Ignore
+      onExitCodes:
+        containerName: procesamiento
+        operator: In
+        values: [42]  # Exit code 42 se ignora
+    
+    # Contar fallos para exit codes específicos
+    - action: Count
+      onExitCodes:
+        containerName: procesamiento
+        operator: In
+        values: [1, 2, 3]
+    
+    # Fallar el Job inmediatamente
+    - action: FailJob
+      onExitCodes:
+        containerName: procesamiento
+        operator: In
+        values: [10, 11]
+    
+    # Fallar el Job en condiciones específicas del Pod
+    - action: FailJob
+      onPodConditions:
+      - type: DisruptionTarget
+  
+  # ========================================================================
+  # MANUAL SELECTOR
+  # ========================================================================
+  # Selector manual para los Pods del Job (raramente usado)
+  # Si se especifica, debes gestionar las labels manualmente
+  # manualSelector: false
+  
+  # ========================================================================
+  # SELECTOR
+  # ========================================================================
+  # Selector de Pods (generalmente generado automáticamente)
+  # selector:
+  #   matchLabels:
+  #     controller-uid: <uid-generado>
+  
+  # ========================================================================
+  # TEMPLATE: Plantilla de Pods
+  # ========================================================================
+  template:
+    metadata:
+      # Labels de los Pods
+      labels:
+        app: procesamiento-datos
+        type: batch
+        job-name: mi-job-procesamiento
+      
+      # Annotations de los Pods
+      annotations:
+        prometheus.io/scrape: "false"  # No scrapear métricas de Jobs batch
+    
+    spec:
+      # ==================================================================
+      # CONTENEDORES
+      # ==================================================================
+      containers:
+      - name: procesamiento
+        image: python:3.11-slim
+        imagePullPolicy: IfNotPresent
+        
+        # Comando del Job
+        command:
+        - /bin/bash
+        - -c
+        
+        # Script del Job
+        args:
+        - |
+          echo "Iniciando procesamiento de datos..."
+          echo "Job Name: $JOB_NAME"
+          echo "Job Index: $JOB_COMPLETION_INDEX"
+          
+          # Simular procesamiento
+          python3 << 'EOF'
+          import time
+          import sys
+          import os
+          
+          job_index = os.getenv('JOB_COMPLETION_INDEX', '0')
+          print(f"Procesando lote {job_index}...")
+          
+          # Simular trabajo
+          for i in range(10):
+              print(f"Progreso: {i*10}%")
+              time.sleep(2)
+          
+          print("Procesamiento completado exitosamente!")
+          sys.exit(0)  # Exit code 0 = éxito
+          EOF
+        
+        # Variables de entorno
+        env:
+        - name: JOB_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        
+        # Índice del Job (solo si completionMode: Indexed)
+        - name: JOB_COMPLETION_INDEX
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+        
+        # Variables desde ConfigMap
+        - name: BATCH_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: job-config
+              key: batch-size
+        
+        # Variables desde Secret
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: job-secrets
+              key: database-password
+        
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: access-key-id
+        
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: secret-access-key
+        
+        # Cargar todas las variables de un ConfigMap
+        envFrom:
+        - configMapRef:
+            name: job-config
+        - secretRef:
+            name: job-env-secrets
+        
+        # Recursos
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+            ephemeral-storage: "2Gi"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+            ephemeral-storage: "5Gi"
+        
+        # Volúmenes montados
+        volumeMounts:
+        - name: data-input
+          mountPath: /data/input
+          readOnly: true
+        
+        - name: data-output
+          mountPath: /data/output
+        
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+        
+        - name: tmp
+          mountPath: /tmp
+        
+        # Contexto de seguridad
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 3000
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      
+      # Contenedor sidecar para subir resultados
+      - name: uploader
+        image: amazon/aws-cli:latest
+        imagePullPolicy: IfNotPresent
+        
+        command:
+        - /bin/bash
+        - -c
+        
+        args:
+        - |
+          # Esperar a que el procesamiento termine
+          while [ ! -f /data/output/complete.flag ]; do
+            sleep 5
+          done
+          
+          # Subir resultados a S3
+          aws s3 cp /data/output/ s3://my-bucket/results/ --recursive
+          echo "Resultados subidos exitosamente"
+        
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: secret-access-key
+        
+        volumeMounts:
+        - name: data-output
+          mountPath: /data/output
+          readOnly: true
+        
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      
+      # ==================================================================
+      # INIT CONTAINERS
+      # ==================================================================
+      initContainers:
+      # Init container para descargar datos
+      - name: init-download-data
+        image: amazon/aws-cli:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Descargando datos de entrada..."
+          aws s3 cp s3://my-bucket/input/ /data/input/ --recursive
+          echo "Datos descargados"
+        
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: secret-access-key
+        
+        volumeMounts:
+        - name: data-input
+          mountPath: /data/input
+      
+      # Init container para validar prerequisitos
+      - name: init-validate
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Validando prerequisitos..."
+          
+          # Verificar conectividad a base de datos
+          nc -zv postgres-service 5432 || exit 1
+          
+          # Verificar espacio disponible
+          df -h /data
+          
+          echo "Validación completada"
+        
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "50m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+      
+      # ==================================================================
+      # VOLÚMENES
+      # ==================================================================
+      volumes:
+      # Volumen vacío para datos de entrada
+      - name: data-input
+        emptyDir: {}
+      
+      # Volumen vacío para datos de salida
+      - name: data-output
+        emptyDir: {}
+      
+      # Volumen temporal
+      - name: tmp
+        emptyDir: {}
+      
+      # ConfigMap con configuración
+      - name: config
+        configMap:
+          name: job-config
+          defaultMode: 0644
+      
+      # ConfigMap con scripts
+      - name: scripts
+        configMap:
+          name: job-scripts
+          defaultMode: 0755
+      
+      # Volumen persistente (si se necesita)
+      - name: persistent-data
+        persistentVolumeClaim:
+          claimName: job-data-pvc
+      
+      # Secret con credenciales
+      - name: credentials
+        secret:
+          secretName: job-credentials
+          defaultMode: 0400
+      
+      # ==================================================================
+      # RESTART POLICY
+      # ==================================================================
+      # CRÍTICO: Jobs solo permiten Never o OnFailure
+      # - Never: no reiniciar contenedores fallidos, crear nuevos Pods
+      # - OnFailure: reiniciar contenedores fallidos en el mismo Pod
+      restartPolicy: OnFailure
+      
+      # ==================================================================
+      # CONFIGURACIÓN DE RED
+      # ==================================================================
+      dnsPolicy: ClusterFirst
+      
+      dnsConfig:
+        nameservers:
+        - 8.8.8.8
+        searches:
+        - default.svc.cluster.local
+      
+      hostname: job-processor
+      
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+      
+      # ==================================================================
+      # SERVICE ACCOUNT Y SEGURIDAD
+      # ==================================================================
+      serviceAccountName: job-service-account
+      automountServiceAccountToken: true
+      
+      securityContext:
+        fsGroup: 2000
+        fsGroupChangePolicy: "OnRootMismatch"
+        runAsUser: 1000
+        runAsGroup: 3000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # ==================================================================
+      # SCHEDULING
+      # ==================================================================
+      
+      # Selector de nodos
+      nodeSelector:
+        workload-type: batch
+        node-size: large
+      
+      # Afinidad
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - compute-optimized
+        
+        # Anti-afinidad para distribuir Pods del Job
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  job-name: mi-job-procesamiento
+              topologyKey: kubernetes.io/hostname
+      
+      # Tolerations
+      tolerations:
+      - key: "batch-workload"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      - key: "spot-instance"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      
+      # Prioridad
+      priorityClassName: batch-priority
+      
+      # ==================================================================
+      # POLÍTICAS
+      # ==================================================================
+      
+      # Tiempo de gracia para terminación
+      terminationGracePeriodSeconds: 30
+      
+      # Deadline activo del Pod (adicional al activeDeadlineSeconds del Job)
+      activeDeadlineSeconds: 3000
+      
+      # ==================================================================
+      # RUNTIME
+      # ==================================================================
+      runtimeClassName: runc
+      
+      # ==================================================================
+      # OTRAS CONFIGURACIONES
+      # ==================================================================
+      imagePullSecrets:
+      - name: registry-credentials
+      
+      enableServiceLinks: false  # Jobs normalmente no necesitan service links
+      shareProcessNamespace: false
+      
+      os:
+        name: linux
+
+# ============================================================================
+# STATUS: Estado del Job (solo lectura, gestionado por Kubernetes)
+# ============================================================================
+# status:
+#   conditions:
+#   - type: Complete
+#     status: "True"
+#     lastProbeTime: 2025-10-27T10:30:00Z
+#     lastTransitionTime: 2025-10-27T10:30:00Z
+#   startTime: 2025-10-27T10:00:00Z
+#   completionTime: 2025-10-27T10:30:00Z
+#   active: 0
+#   succeeded: 5
+#   failed: 0
+
+---
+# ============================================================================
+# EJEMPLOS DE DIFERENTES CONFIGURACIONES DE JOBS
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# EJEMPLO 1: JOB SIMPLE (una sola ejecución)
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: simple-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: busybox:1.35
+        command: ["echo", "Hello from Job!"]
+      restartPolicy: Never
+  backoffLimit: 3
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 2: JOB PARALELO (múltiples workers simultáneos)
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parallel-job
+spec:
+  completions: 10      # Necesita 10 completaciones
+  parallelism: 3       # 3 Pods en paralelo
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: perl:5.34
+        command: ["perl", "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+      restartPolicy: OnFailure
+  backoffLimit: 4
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 3: JOB INDEXED (cada Pod procesa un índice específico)
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: indexed-job
+spec:
+  completions: 5
+  parallelism: 2
+  completionMode: Indexed  # Cada Pod tiene un índice (0-4)
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          INDEX=${JOB_COMPLETION_INDEX}
+          echo "Procesando índice $INDEX"
+          # Procesar datos específicos del índice
+      restartPolicy: Never
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 4: JOB CON TIMEOUT
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: timeout-job
+spec:
+  activeDeadlineSeconds: 600  # Máximo 10 minutos
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: busybox:1.35
+        command: ["sleep", "300"]
+      restartPolicy: Never
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 5: JOB CON AUTO-LIMPIEZA
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: auto-cleanup-job
+spec:
+  ttlSecondsAfterFinished: 3600  # Eliminar después de 1 hora
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: busybox:1.35
+        command: ["echo", "Este Job se auto-eliminará"]
+      restartPolicy: Never
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 6: JOB DE BACKUP DE BASE DE DATOS
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-backup-job
+  labels:
+    app: database
+    type: backup
+spec:
+  template:
+    spec:
+      containers:
+      - name: backup
+        image: postgres:14-alpine
+        command:
+        - /bin/bash
+        - -c
+        - |
+          pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME > /backup/dump.sql
+          gzip /backup/dump.sql
+          # Subir a S3 o almacenamiento externo
+        env:
+        - name: DB_HOST
+          value: postgres-service
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: username
+        - name: DB_NAME
+          value: mydb
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        volumeMounts:
+        - name: backup-storage
+          mountPath: /backup
+      volumes:
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: backup-pvc
+      restartPolicy: OnFailure
+  backoffLimit: 3
+
+# ============================================================================
+# NOTAS IMPORTANTES SOBRE JOBS
+# ============================================================================
+# 1. RESTART POLICY:
+#    - SOLO permitidos: Never o OnFailure
+#    - Never: crear nuevo Pod si falla
+#    - OnFailure: reiniciar contenedor en el mismo Pod
+#
+# 2. COMPLETIONS Y PARALLELISM:
+#    - completions=1, parallelism=1: Job simple (1 Pod)
+#    - completions>1, parallelism=1: Job secuencial
+#    - completions>1, parallelism>1: Job paralelo
+#    - completions=null, parallelism>1: Work queue (continuar hasta que todos los Pods completen)
+#
+# 3. COMPLETION MODES:
+#    - NonIndexed: trabajo no estructurado, Pods sin índice
+#    - Indexed: cada Pod tiene índice único, útil para procesamiento particionado
+#
+# 4. BACKOFF LIMIT:
+#    - Cuenta fallos de Pods, no reintentos de contenedores
+#    - backoffLimit=0: sin reintentos
+#    - backoffLimit=6: por defecto
+#
+# 5. LIMPIEZA:
+#    - ttlSecondsAfterFinished: auto-eliminar Job después de completar/fallar
+#    - Sin TTL: Jobs permanecen indefinidamente (limpiar manualmente)
+#
+# 6. CASOS DE USO:
+#    - Procesamiento batch
+#    - Migraciones de base de datos
+#    - Backups
+#    - Generación de reportes
+#    - Procesamiento de colas
+#    - Tareas de mantenimiento
+#
+# 7. DIFERENCIAS CON CRONJOB:
+#    - Job: ejecución única
+#    - CronJob: ejecuciones programadas recurrentes
+
+# ============================================================================
+# FIN DEL JOB
+# ============================================================================

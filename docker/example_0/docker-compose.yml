@@ -1,0 +1,38 @@
+# docker run --detach --name some-mariadb --env MARIADB_USER=example-user --env MARIADB_PASSWORD=my_cool_secret --env MARIADB_DATABASE=exmple-database --env MARIADB_ROOT_PASSWORD=my-secret-pw mariadb:latest
+services:
+  db:
+    image: mariadb:latest
+    container_name: some-mariadb
+    environment:
+      MARIADB_USER: example-user
+      MARIADB_PASSWORD: my_cool_secret
+      MARIADB_DATABASE: example-database
+      MARIADB_ROOT_PASSWORD: my-secret-pw
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - networkName
+      # phpmyadmin para gestionar la base de datos
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: my-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: example-user
+      PMA_PASSWORD: my_cool_secret
+    ports:
+      - "8083:80"
+    depends_on:
+      - db
+    networks:
+      - networkName
+
+volumes:
+  db_data:
+
+networks:
+  networkName:
+    driver: bridge

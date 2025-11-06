@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nodejs-sidecar-pod
+  labels:
+    app: nodejs-sidecar
+spec:
+  containers:
+  - name: nodejs-app
+    image: node:14-alpine
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        mkdir -p /var/log/app
+        while true; do
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Processing request..." >> /var/log/app/app.log
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Request completed successfully" >> /var/log/app/app.log
+          sleep 5
+        done
+    volumeMounts:
+    - name: logs
+      mountPath: /var/log/app
+
+  - name: log-sidecar
+    image: busybox:latest
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "Starting log monitor..."
+        tail -f /var/log/app/app.log
+    volumeMounts:
+    - name: logs
+      mountPath: /var/log/app
+
+  volumes:
+  - name: logs
+    emptyDir: {}

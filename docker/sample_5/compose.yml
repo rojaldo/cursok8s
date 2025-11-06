@@ -1,0 +1,45 @@
+services:
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "8080:80"
+    volumes:
+      - ./html:/usr/share/nginx/html
+    networks:
+      - mynetwork
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: rebuild
+          path: ./nginx
+  app:
+    image: my-watch
+    build:
+      context: .
+      dockerfile: Dockerfile
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://nginx:80/hola.html"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - mynetwork
+    depends_on:
+      - nginx
+
+  watchdog:
+    image: buanet/watchdog
+    environment:
+      - WATCHDOG_INTERVAL=20
+      - WATCHDOG_HEALTHCHECK=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    networks:
+      - mynetwork
+networks:
+  mynetwork:
+    driver: bridge

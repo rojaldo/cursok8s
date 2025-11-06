@@ -1,0 +1,640 @@
+== Docker Buildx
+
+=== Introducción a Docker Buildx
+
+Docker Buildx es una extensión de la CLI de Docker que proporciona capacidades avanzadas para construir imágenes de contenedores gracias a su integración directa con BuildKit, el motor de compilación de nueva generación de Docker. Buildx amplía las capacidades tradicionales de `docker build`, permitiendo, entre otras cosas, la creación de imágenes multiplataforma, la gestión avanzada de caché y la ejecución de compilaciones en paralelo, todo desde la misma interfaz de Docker.
+
+Buildx funciona bajo un modelo cliente-servidor: Buildx actúa como cliente e interfaz de usuario, mientras que BuildKit es el servidor (o "builder") que ejecuta realmente los pasos de la compilación. Cuando ejecutas un comando como `docker buildx build`, la CLI de Docker (Buildx) envía una solicitud de compilación al backend de BuildKit, que se encarga de procesar las instrucciones del Dockerfile, gestionar argumentos, cachés y exportar los resultados en el formato deseado.
+
+Esta arquitectura permite que BuildKit realice optimizaciones que el constructor heredado de Docker no puede, como la ejecución de etapas independientes en paralelo y el uso eficiente de la caché, lo que resulta en compilaciones más rápidas y reproducibles. Además, Buildx permite gestionar múltiples "builders" (instancias de BuildKit), tanto locales como remotos, facilitando la escalabilidad y la integración con infraestructuras de CI/CD o clústeres de Kubernetes.
+
+En resumen, Buildx es la interfaz avanzada y flexible para construir imágenes Docker, mientras que BuildKit es el motor subyacente que ejecuta la compilación de manera eficiente y moderna.
+
+.Aunque ambos comandos (`docker build` y `docker buildx build`) utilizan BuildKit como motor de compilación en las versiones modernas de Docker, existen diferencias clave en su alcance y funcionalidad:
+* `docker build` es esencialmente un alias de `docker buildx build` en las versiones recientes de Docker, ya que ambos invocan BuildKit por defecto. Sin embargo, `docker build` ejecuta las compilaciones usando el builder por defecto (driver `docker`), que tiene funcionalidades limitadas y requiere menos configuración.
+
+* `docker buildx build` es un superconjunto de `docker build` y expone todas las capacidades avanzadas de BuildKit. Permite:
+** Crear y gestionar múltiples "builders" (instancias de BuildKit) con diferentes configuraciones y drivers (por ejemplo, `docker-container`, `remote`), lo que facilita la construcción en diferentes entornos o arquitecturas.
+** Construir imágenes multiplataforma (multi-arch) de forma nativa y sencilla, algo que `docker build` no soporta completamente sin configuraciones adicionales.
+** Ejecutar builds en paralelo y aprovechar estrategias avanzadas de caché, tanto local como remota o embebida en el registro, optimizando tiempos y recursos.
+** Usar opciones avanzadas como `--output`, `--cache-from`, `--cache-to`, `--secret`, `--ssh`, y otras que no están disponibles o son limitadas en `docker build`.
+
+* En resumen:
+[cols="2,2"]
+|===
+| `docker build` | `docker buildx build`
+
+| Alias de Buildx, usa el builder por defecto (driver `docker`). Limitado en funcionalidades avanzadas.
+| Permite gestionar múltiples builders, drivers y configuraciones avanzadas.
+
+| Soporte básico para builds; multi-arquitectura solo con hacks o configuraciones externas.
+| Soporte nativo para builds multiplataforma, caché avanzada y outputs flexibles.
+
+| Menor flexibilidad y personalización.
+| Máxima flexibilidad, ideal para CI/CD, builds distribuidos y optimización de recursos.
+|===
+
+
+.Buildx amplía significativamente las capacidades de construcción de imágenes en Docker, aportando ventajas clave que lo convierten en la herramienta recomendada para flujos de trabajo modernos:
+
+* Multi-arquitectura (multiplataforma):
+** Permite construir imágenes para varias arquitecturas de CPU (por ejemplo, amd64, arm64, arm/v7) en una sola línea de comando, generando un manifiesto multiarquitectura (“fat manifest”) que facilita el despliegue en entornos heterogéneos como servidores x86, dispositivos IoT, o clusters mixtos.
+** Utiliza emulación (QEMU) o builders nativos para cada plataforma, lo que simplifica el proceso y elimina la necesidad de configuraciones complejas o scripts adicionales.
+** Ejemplo:
++
+----
+docker buildx build --platform linux/amd64,linux/arm64 -t usuario/imagen:tag --push .
+----
+
+* Caché avanzada:
+** Implementa una estrategia de caché de tres niveles: caché incrustada en la imagen, caché local y caché basada en registros remotos.
+** Permite compartir la caché entre diferentes máquinas o entornos, ideal para equipos distribuidos y pipelines CI/CD.
+** Mejora drásticamente los tiempos de construcción al reutilizar capas previas, incluso entre builds en distintas plataformas o entornos.
+** Ejemplo de uso de caché local:
++
+----
+docker buildx build --cache-to type=local,dest=./buildcache -t myapp:latest .
+docker buildx build --cache-from type=local,src=./buildcache -t myapp:latest .
+----
+
+* Paralelismo en la construcción:
+** Buildx puede analizar el Dockerfile y ejecutar etapas independientes en paralelo, aprovechando al máximo los recursos disponibles y reduciendo significativamente el tiempo total de construcción.
+** Esta capacidad es especialmente útil en builds complejos o multi-stage, donde varias dependencias pueden instalarse o compilarse simultáneamente.
+
+* Outputs flexibles:
+** Permite exportar el resultado de la build en diferentes formatos y destinos: imagen local, archivo tar, directorio, registro remoto, etc.
+** Facilita la integración con otros sistemas y la distribución de imágenes en distintos entornos de despliegue.
+** Ejemplo:
++
+----
+docker buildx build --output type=tar,dest=miimagen.tar -t miapp:latest .
+----
+
+* Integración con clusters y CI/CD:
+** Puede distribuir las tareas de construcción en clusters Kubernetes, aprovechando la escalabilidad, alta disponibilidad y optimización de recursos de estos entornos.
+** Esto permite builds más rápidas y robustas, especialmente en equipos grandes o proyectos con necesidades de despliegue continuo.
+
+En resumen, Buildx ofrece una solución moderna, eficiente y flexible para construir imágenes Docker, facilitando la portabilidad, el rendimiento y la integración en infraestructuras de desarrollo y producción actuales.
+
+
+=== Conceptos Fundamentales
+
+==== Arquitectura cliente-servidor: Buildx (cliente) y BuildKit (servidor)
+
+Docker Buildx y BuildKit se basan en una arquitectura cliente-servidor que separa claramente la interfaz de usuario de la ejecución real de las compilaciones.
+
+* Buildx actúa como el cliente: es la herramienta de línea de comandos (CLI) que interpreta los comandos del usuario, gestiona las opciones de construcción y envía las solicitudes de build.
+* BuildKit es el servidor (o "builder"): es el demonio responsable de ejecutar las instrucciones del Dockerfile, gestionar la caché, realizar las etapas en paralelo y exportar los resultados.
+
+Cuando ejecutas un comando como `docker buildx build`, Buildx selecciona una instancia de constructor (builder), envía el contexto y las instrucciones de construcción al backend de BuildKit, y este último analiza el Dockerfile para crear un grafo de dependencias. BuildKit identifica qué pasos pueden ejecutarse en paralelo y optimiza la utilización de recursos, lo que acelera significativamente el proceso de construcción frente al modelo secuencial tradicional.
+
+.Características de esta arquitectura:
+* Ejecución remota de builds: puedes dirigir tu CLI local a una instancia remota de BuildKit, por ejemplo, en un servidor potente, en la nube o en un clúster Kubernetes, sin consumir recursos locales innecesarios.
+* Flexibilidad y escalabilidad: puedes gestionar múltiples instancias de builder, cada una con configuraciones y capacidades distintas, adaptándose a diferentes necesidades de desarrollo y despliegue.
+* Eficiencia y modularidad: BuildKit solo solicita los recursos necesarios en el momento preciso (por ejemplo, archivos locales, secretos, credenciales), evitando transferencias innecesarias y mejorando la seguridad y el rendimiento.
+
+En resumen, la arquitectura cliente-servidor de Buildx y BuildKit permite desacoplar la interfaz de usuario de la ejecución de builds, facilitando construcciones más rápidas, escalables y adaptadas a entornos modernos y distribuidos.
+
+==== Qué es un "builder" y para qué sirve
+
+Un "builder" es una instancia del demonio BuildKit que se utiliza para ejecutar procesos de construcción de imágenes o artefactos a partir de un Dockerfile. En términos prácticos, un builder es el entorno (local o remoto) donde se llevan a cabo las compilaciones gestionadas por Buildx.
+
+Los builders permiten:
+
+* Ejecutar builds de forma independiente y aislada, cada uno con su propia configuración, caché y capacidades.
+* Gestionar múltiples entornos de construcción: puedes crear builders locales, en contenedores dedicados, en clusters de Kubernetes o en servidores remotos, según las necesidades del proyecto.
+* Seleccionar y cambiar fácilmente entre diferentes builders usando la CLI de Docker, lo que facilita la adaptación a distintos flujos de trabajo o plataformas.
+* Optimizar y escalar builds: al distribuir las tareas entre varios builders, puedes acelerar los tiempos de construcción y aprovechar recursos externos sin sobrecargar tu máquina local.
+
+El builder predeterminado suele estar vinculado al demonio Docker local, pero puedes crear y gestionar otros builders con configuraciones personalizadas, por ejemplo, para builds multiplataforma o con caché compartida.
+
+En resumen, un builder es la entidad que ejecuta los procesos de construcción en Docker Buildx, y su gestión flexible permite adaptar, escalar y optimizar los flujos de trabajo de construcción de imágenes en proyectos modernos.
+
+==== Drivers disponibles: docker, docker-container, kubernetes, remote
+
+Buildx soporta varios drivers que determinan cómo y dónde se ejecuta el backend de BuildKit, permitiendo adaptar el entorno de construcción a diferentes necesidades y escenarios:
+
+* `docker` (por defecto):
+** Utiliza la biblioteca BuildKit integrada en el demonio Docker.
+** Prioriza la simplicidad y facilidad de uso, pero tiene soporte limitado para funcionalidades avanzadas como exportación de caché o formatos de salida personalizados.
+** Las imágenes construidas aparecen automáticamente en el listado local de imágenes (`docker images`).
+** No soporta nativamente la construcción multiplataforma ni la exportación avanzada de caché.
+
+* `docker-container`:
+** Crea un entorno BuildKit dedicado en un contenedor Docker gestionado por Buildx.
+** Permite usar versiones personalizadas de BuildKit y soporta funcionalidades avanzadas como builds multiplataforma, exportación/importación de caché y configuración de recursos del contenedor (CPU, memoria, etc).
+** Las imágenes no aparecen automáticamente en el listado local; debes usar `--load` para cargarlas o `--push` para subirlas a un registro.
+
+* `kubernetes`:
+** Despliega pods BuildKit en un clúster de Kubernetes, permitiendo aprovechar la escalabilidad y recursos del clúster para builds distribuidos y de alto rendimiento.
+** Ideal para integraciones CI/CD en entornos empresariales o builds a gran escala.
+** Las imágenes tampoco aparecen automáticamente en el listado local; requiere `--load` o `--push`.
+
+* `remote`:
+** Se conecta a una instancia de BuildKit gestionada manualmente, ya sea en otra máquina, en la nube o expuesta mediante un socket o endpoint TCP.
+** Útil para escenarios donde se necesita separar la orquestación del build de la ejecución, o para aprovechar hardware específico (por ejemplo, builds nativos para ARM en máquinas ARM).
+** Requiere configuración manual del daemon BuildKit y de los certificados de seguridad si es necesario.
+
+[cols="5,5,5,5,5"]
+|===
+|Característica | docker | docker-container | kubernetes | remote
+
+|Simplicidad y uso inmediato
+|✅
+|—
+|—
+|—
+
+|Soporte multi-arquitectura
+|Limitado
+|✅
+|✅
+|✅
+
+|Exportación avanzada de caché
+|Limitado
+|✅
+|✅
+|✅
+
+|Configuración personalizada de recursos
+|No
+|Sí
+|Sí (vía Kubernetes)
+|Sí (según configuración)
+
+|Aparición automática en `docker images`
+|✅
+|No (requiere `--load`)
+|No (requiere `--load`)
+|No (requiere `--load`)
+|===
+
+Cada driver está pensado para un caso de uso específico, desde la simplicidad local hasta la escalabilidad y personalización en entornos distribuidos o empresariales.
+
+
+=== Gestión de Instancias de Builder
+
+Docker Buildx permite gestionar múltiples instancias de builder, cada una con su propia configuración, capacidades y contexto. Esto es fundamental para adaptarse a diferentes flujos de trabajo, arquitecturas y entornos de construcción.
+
+==== Listar builders disponibles
+
+Para ver todas las instancias de builder y sus detalles, utiliza:
+
+----
+docker buildx ls
+----
+
+El resultado muestra los nombres, drivers, estado, versión de BuildKit y las plataformas soportadas por cada builder. El builder actualmente seleccionado aparece marcado con un asterisco (`*`).
+
+==== Crear un nuevo builder
+
+Puedes crear una nueva instancia de builder con un nombre personalizado usando:
+
+----
+docker buildx create --name <nombre_builder>
+----
+
+Por defecto, este comando usa el driver `docker-container`, que es el más flexible para builds avanzados y multiplataforma.
+
+==== Cambiar de builder
+
+Para seleccionar el builder que quieres usar en tus operaciones de construcción:
+
+----
+docker buildx use <nombre_builder>
+----
+
+Esto establece el builder como predeterminado para el contexto actual.
+
+==== Inspeccionar un builder
+
+Para ver información detallada sobre un builder específico, incluyendo nodos, plataformas soportadas y configuración:
+
+----
+docker buildx inspect <nombre_builder>
+----
+
+Puedes añadir la opción `--bootstrap` para asegurarte de que el builder está iniciado antes de inspeccionarlo.
+
+==== Eliminar un builder
+
+Si ya no necesitas un builder, puedes eliminarlo con:
+
+----
+docker buildx rm <nombre_builder>
+----
+
+Esto libera recursos y mantiene tu entorno organizado.
+
+==== Resumen de comandos principales
+
+|===
+| Comando                           | Descripción                                         
+| `docker buildx ls`                | Lista todos los builders disponibles                
+| `docker buildx create --name N`   | Crea una nueva instancia de builder                 
+| `docker buildx use N`             | Cambia al builder N como predeterminado             
+| `docker buildx inspect [N]`       | Inspecciona el builder N o el actual                
+| `docker buildx rm N`              | Elimina el builder N                                
+|===
+
+Esta gestión flexible de instancias de builder permite optimizar y personalizar los procesos de construcción en Docker Buildx, facilitando la adaptación a proyectos de distinta complejidad y requisitos de arquitectura.
+
+
+=== Uso Básico de Buildx
+
+Docker Buildx es la herramienta recomendada para construir imágenes de contenedores modernas, permitiendo compilaciones multiplataforma, optimización de caché y procesamiento en paralelo, todo integrado en la CLI de Docker.
+
+==== Comando principal
+
+El comando base para iniciar una construcción es:
+
+----
+docker buildx build [OPCIONES] RUTA_O_URL_DEL_CONTEXTO
+----
+
+Por ejemplo, para construir una imagen desde el Dockerfile del directorio actual:
+
+----
+docker buildx build -t mi_aplicacion_web:1.0 .
+----
+
+==== Opciones más comunes
+
+Las opciones principales que puedes usar con `docker buildx build` son:
+
+* `-t, --tag nombre:etiqueta`  
+  Asigna un nombre y etiqueta a la imagen resultante.
+
+* `-f, --file ruta_al_dockerfile`  
+  Especifica el archivo Dockerfile a utilizar (por defecto busca `Dockerfile` en el contexto).
+
+* `--platform plataforma[,plataforma...]`  
+  Define la(s) plataforma(s) objetivo, por ejemplo: `linux/amd64,linux/arm64`.
+
+* `--push`  
+  Publica la imagen directamente en un registro remoto tras la construcción.
+
+* `--load`  
+  Carga la imagen construida en el demonio Docker local (útil si usas el driver `docker-container`).
+
+* `-o, --output tipo=destino`  
+  Exporta el resultado a diferentes formatos o ubicaciones, como un directorio local, archivo tar, o registro.
+
+* `--build-arg clave=valor`  
+  Pasa variables de entorno al proceso de construcción.
+
+* `--cache-from`, `--cache-to`  
+  Gestiona fuentes y destinos de caché para acelerar builds y compartir resultados entre entornos.
+
+* `--secret id=mi_secreto,src=/ruta/al/archivo`  
+  Inyecta secretos de forma segura durante la construcción.
+
+* `--ssh default`  
+  Permite el uso de claves SSH en etapas que lo requieran.
+
+==== Ejemplos prácticos
+
+* Construir imagen básica:
++
+----
+docker buildx build -t mi_app:latest .
+----
+
+* Construcción multiplataforma y push:
++
+----
+docker buildx build --platform linux/amd64,linux/arm64 -t usuario/mi_app:multiarch --push .
+----
+
+* Usar un Dockerfile específico y contexto personalizado:
++
+----
+docker buildx build -f Dockerfile.prod -t mi_app:prod ./src
+----
+
+* Utilizar caché local para acelerar builds:
++
+----
+docker buildx build --cache-from type=local,src=./buildcache --cache-to type=local,dest=./buildcache -t mi_app:cache .
+----
+
+==== Flujo de trabajo resumido
+
+1. Selecciona o crea un builder adecuado para tu proyecto.
+2. Ejecuta `docker buildx build` con las opciones necesarias según tu flujo de trabajo.
+3. Inspecciona los resultados y, si es necesario, publica o exporta la imagen.
+
+
+
+=== Ejemplos Prácticos
+
+Docker Buildx permite construir imágenes de forma eficiente y flexible, tanto para desarrollos locales como para despliegues multiplataforma o integraciones en CI/CD. A continuación se muestran ejemplos prácticos de uso, desde lo más básico hasta flujos avanzados.
+
+==== Construcción básica de una imagen
+
+Supón que tienes un proyecto Node.js con el siguiente Dockerfile:
+
+----
+FROM node:14
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 8080
+
+CMD ["node", "server.js"]
+----
+
+Para construir la imagen usando Buildx:
+
+----
+docker buildx build -t my-node-app:latest .
+----
+
+Esto genera una imagen etiquetada como `my-node-app:latest` usando el Dockerfile del directorio actual.
+
+==== Construcción multiplataforma
+
+Si necesitas que tu imagen funcione tanto en arquitecturas amd64 como arm64 (por ejemplo, para servidores x86 y Raspberry Pi), puedes usar:
+
+----
+docker buildx build --platform linux/amd64,linux/arm64 -t my-multi-platform-app:latest --push .
+----
+
+Este comando construye la imagen para ambas arquitecturas y la sube directamente a un registro (por ejemplo, Docker Hub), permitiendo que cualquier máquina la descargue y ejecute sin importar su arquitectura.
+
+==== Uso de compilaciones multietapa (multi-stage builds)
+
+Las compilaciones multietapa permiten optimizar el tamaño y la seguridad de las imágenes. Por ejemplo, para una aplicación Python:
+
+----
+# Dockerfile.optimized
+
+FROM python:3.13-slim AS base
+WORKDIR /app
+COPY requirements.txt .
+
+FROM base AS builder
+RUN pip install --no-cache-dir --target=/install -r requirements.txt
+
+FROM base AS linter
+COPY --from=builder /install /usr/local/lib/python3.13/site-packages
+COPY app.py .
+RUN pip install pylint && pylint app.py || exit 0
+
+FROM base AS tester
+COPY --from=builder /install /usr/local/lib/python3.9/site-packages
+COPY app.py .
+RUN pip install pytest && python -m pytest app.py -v || exit 0
+
+FROM python:3.13-alpine AS final
+WORKDIR /app
+COPY --from=builder /install /usr/local/lib/python3.13/site-packages
+COPY app.py .
+EXPOSE 5000
+CMD ["python", "app.py"]
+----
+
+Construye la imagen optimizada así:
+
+----
+docker buildx build --file Dockerfile.optimized -t myapp:optimized --load .
+----
+
+Buildx ejecutará las etapas independientes (como `linter` y `tester`) en paralelo, acelerando el proceso y generando una imagen final más pequeña y eficiente.
+
+==== Ejemplo de caché avanzada
+
+Para acelerar builds repetidos, puedes utilizar la caché local:
+
+----
+docker buildx build --cache-to type=local,dest=./buildcache -t myapp:latest .
+docker buildx build --cache-from type=local,src=./buildcache -t myapp:latest .
+----
+
+Esto permite reutilizar capas previas y reducir drásticamente los tiempos de compilación en desarrollos iterativos.
+
+==== Automatización en CI/CD
+
+Buildx se integra fácilmente en pipelines de CI/CD. Por ejemplo, en GitHub Actions o Jenkins puedes crear el builder, construir la imagen multiplataforma y subirla a un registro en cada push:
+
+----
+docker buildx create --use
+docker buildx build --platform linux/amd64,linux/arm64 -t usuario/app:ci --push .
+----
+
+==== Exportar imágenes en diferentes formatos
+
+Puedes exportar el resultado a un archivo tar o a un directorio local, útil para pruebas o distribución fuera de un registro:
+
+----
+docker buildx build --output type=tar,dest=miimagen.tar -t miapp:latest .
+docker buildx build --output type=local,dest=./output -t miapp:latest .
+----
+
+
+=== Funcionalidades Avanzadas
+
+Docker Buildx ofrece un conjunto de funcionalidades avanzadas que amplían y optimizan los flujos de trabajo de construcción de imágenes, especialmente en entornos complejos, distribuidos o de CI/CD. Estas capacidades van mucho más allá de lo que permite el comando clásico `docker build`.
+
+==== Construcción multiplataforma y cross-compilation
+
+* Permite construir imágenes para varias arquitecturas (por ejemplo, `linux/amd64`, `linux/arm64`, etc.) en un solo comando, generando imágenes listas para ejecutarse en cualquier entorno objetivo.
+* Soporta la compilación cruzada (cross-compilation), permitiendo crear imágenes para arquitecturas distintas a la de la máquina host, ideal para IoT, edge computing o despliegues híbridos.
+
+==== Optimización de builds multietapa y paralelismo
+
+* Buildx aprovecha BuildKit para identificar etapas independientes en Dockerfiles multietapa y ejecutarlas en paralelo, acelerando significativamente la construcción y reduciendo el tiempo total de build.
+* Esta optimización es especialmente útil en proyectos con etapas de linting, testing y build desacopladas, donde las tareas pueden ejecutarse simultáneamente.
+
+==== Exportadores y outputs flexibles
+
+* Buildx soporta múltiples tipos de exportadores para los resultados de la build, configurables mediante la opción `--output`:
+** `image`: exporta la imagen al demonio Docker local.
+** `registry`: sube la imagen directamente a un registro remoto.
+** `local`: exporta el sistema de archivos raíz de la build a un directorio local.
+** `tar`: empaqueta el sistema de archivos raíz en un archivo tar local.
+** `oci`: exporta la imagen en formato OCI.
+** `docker`: exporta la imagen en formato Docker Image Spec v1.2.0.
+** `cacheonly`: ejecuta el build solo para generar caché, sin exportar una imagen.
+* Ejemplo:
++
+----
+docker buildx build --output type=tar,dest=miimagen.tar -t miapp:latest .
+----
+
+==== Gestión avanzada de caché
+
+* Buildx permite exportar e importar caché de builds, tanto localmente como en registros remotos, acelerando builds repetidos y facilitando la colaboración en equipos distribuidos.
+* Ejemplo:
++
+----
+docker buildx build --cache-to type=local,dest=./buildcache -t myapp:latest .
+docker buildx build --cache-from type=local,src=./buildcache -t myapp:latest .
+----
+
+==== Ejecución remota y builders externos
+
+* Puedes ejecutar builds en builders remotos, servidores dedicados, clusters Kubernetes o servicios en la nube, liberando recursos locales y escalando la capacidad de construcción según la demanda.
+* Esto permite adaptar los flujos de trabajo a necesidades empresariales, builds masivos o integración con pipelines de CI/CD.
+
+==== buildx bake: orquestación de builds complejos
+
+* `docker buildx bake` permite definir y construir múltiples imágenes en paralelo desde un solo archivo de configuración (`docker-bake.hcl`, JSON o incluso archivos de Docker Compose).
+* Ideal para monorepos, microservicios o proyectos con múltiples imágenes y dependencias compartidas.
+* Ejemplo de archivo HCL:
++
+----
+group "default" {
+  targets = ["app", "db", "cron"]
+}
+
+target "app" {
+  dockerfile = "Dockerfile.app"
+  platforms = ["linux/amd64", "linux/arm64"]
+  tags = ["repo/app:test"]
+}
+----
+* Ejecuta todos los targets en paralelo:
++
+----
+docker buildx bake
+----
+
+==== buildx imagetools: gestión avanzada de imágenes y manifests
+
+* El subcomando `docker buildx imagetools` permite trabajar con manifest lists en registros de contenedores, inspeccionando y gestionando imágenes multiplataforma y sus configuraciones.
+* Ejemplo:
++
+----
+docker buildx imagetools inspect usuario/imagen:tag
+----
+
+=== Buenas Prácticas y Optimización
+
+Aplicar buenas prácticas y técnicas de optimización al usar Docker Buildx es fundamental para obtener imágenes más pequeñas, builds más rápidos y flujos de trabajo predecibles y eficientes. A continuación se resumen las recomendaciones clave respaldadas por la experiencia y la documentación especializada:
+
+==== Optimización de builds multietapa y paralelismo
+
+* Utiliza compilaciones multietapa para reducir el tamaño de la imagen final, separando las fases de construcción, pruebas, linting y empaquetado. Solo copia al resultado final lo estrictamente necesario.
+* Buildx permite que etapas independientes se ejecuten en paralelo, acelerando significativamente el proceso de construcción frente al builder clásico. Por ejemplo, las etapas de `linter` y `tester` pueden correr simultáneamente si no dependen entre sí.
+* Ejemplo de build multietapa optimizada:
++
+----
+docker buildx build --file Dockerfile.optimized -t myapp:optimized --load .
+----
+
+==== Aprovecha la caché avanzada
+
+* Usa las opciones `--cache-from` y `--cache-to` para reutilizar capas previas y compartir caché entre diferentes builds o entornos, acelerando reconstrucciones y ahorrando recursos.
+* Ejemplo:
++
+----
+# Primera build: crea la caché
+docker buildx build --load -t myapp:latest --cache-to type=local,dest=./buildcache .
+
+# Builds posteriores: reutiliza la caché
+docker buildx build --load -t myapp:latest --cache-from type=local,src=./buildcache .
+----
+* Ordena las instrucciones del Dockerfile de lo más estable a lo más cambiante para maximizar el aprovechamiento de la caché.
+* Utiliza `--mount=type=cache` en etapas que descargan dependencias o generan archivos temporales, para mantener estos directorios entre builds.
+
+==== Minimiza el contexto de build
+
+* Usa un archivo `.dockerignore` bien definido para excluir archivos y carpetas innecesarias del contexto de build (por ejemplo: `.git`, `node_modules`, archivos temporales, etc.), lo que reduce el tamaño del contexto y acelera la transferencia y el análisis.
++
+----
+# Ejemplo de .dockerignore
+.git
+node_modules
+__pycache__
+*.pyc
+*.pyo
+.DS_Store
+----
+* Esto evita que archivos irrelevantes se copien a la imagen y que la caché se invalide por cambios frecuentes en archivos no esenciales.
+
+==== Mantén el Dockerfile simple y eficiente
+
+* Minimiza el número de capas combinando comandos en una sola instrucción `RUN` cuando sea posible.
+* Limpia archivos temporales y cachés de paquetes tras la instalación para reducir el tamaño final de la imagen.
+* Coloca las instrucciones que cambian menos al principio del Dockerfile y las más volátiles (como `COPY . .`) al final, para aprovechar mejor la caché de capas.
+
+==== Usa etiquetas y versiones explícitas
+
+* Etiqueta tus imágenes con versiones o tags significativos para evitar confusiones y facilitar la trazabilidad en despliegues y entornos de CI/CD.
+* Evita utilizar solo `latest` salvo en entornos de desarrollo.
+
+==== Seguridad y secretos
+
+* Usa el soporte de secretos de Buildx (`--secret`) para inyectar credenciales o claves de forma segura durante la build, evitando que queden expuestas en las capas de la imagen.
+
+==== Medición y comparación de builds
+
+* Mide los tiempos de construcción y el tamaño de las imágenes para validar las mejoras introducidas:
++
+----
+time docker buildx build --load -t myapp:parallel -f Dockerfile.parallel .
+docker images myapp
+----
+
+=== Recursos y documentación para buildx
+
+Contar con recursos oficiales y comunitarios es fundamental para dominar Docker Buildx y aprovechar todas sus capacidades avanzadas. A continuación se listan las principales fuentes de información y soporte técnico actualizadas a 2025:
+
+==== Documentación oficial de Docker Buildx
+
+* Referencia de comandos y opciones:
+** https://docs.docker.com/reference/cli/docker/buildx/ 
+** https://docs.docker.com/reference/cli/docker/buildx/build/ 
+* Conceptos y arquitectura:
+** https://docs.docker.com/build/concepts/overview/ 
+* Guía de trabajo con Buildx:
+** https://docker-docs.uclv.cu/buildx/working-with-buildx/ 
+
+==== Repositorio oficial en GitHub
+
+* Código fuente, releases, issues y documentación técnica avanzada:
+** https://github.com/docker/buildx 
+* Ejemplos de instalación manual, uso en Dockerfile y automatización en CI/CD.
+
+==== Comunidad Docker
+
+* Foros, blogs, tutoriales y contribuciones de expertos (Docker Captains):
+** https://www.docker.com/community/ 
+* Ejemplos de integración con GitHub Actions, publicación de imágenes multi-arch, buenas prácticas y casos de uso reales.
+
+==== Subcomandos y utilidades clave
+
+Buildx incluye subcomandos útiles para gestionar builders, caché, imágenes y flujos avanzados:
+
+|===
+| Comando                        | Descripción                                              
+| `docker buildx build`          | Inicia una build con BuildKit                            
+| `docker buildx create`         | Crea una nueva instancia de builder                      
+| `docker buildx ls`             | Lista builders disponibles                               
+| `docker buildx use`            | Selecciona el builder activo                             
+| `docker buildx inspect`        | Muestra detalles del builder                             
+| `docker buildx rm`             | Elimina builders                                         
+| `docker buildx bake`           | Orquesta builds desde archivos de configuración          
+| `docker buildx imagetools`     | Gestiona y consulta imágenes y manifests multi-arch      
+| `docker buildx prune`          | Limpia caché de builds                                   
+| `docker buildx version`        | Muestra la versión de buildx instalada                   
+|===
+
+==== Instalación y actualización
+
+* Buildx viene incluido por defecto en Docker Desktop (Windows/macOS) y en los paquetes oficiales de Docker Engine para Linux.
+* Para instalaciones manuales o actualizaciones específicas, consulta el repositorio de GitHub y sigue las instrucciones para tu sistema operativo.
+
+==== Consejos para profundizar
+
+* Consulta los ejemplos y tutoriales de la comunidad para casos prácticos y automatización en CI/CD (por ejemplo, integración con GitHub Actions o Jenkins).
+* Participa en foros y canales oficiales para resolver dudas y compartir experiencias con otros usuarios avanzados.
+* Revisa periódicamente las notas de versión y la hoja de ruta pública para estar al día de nuevas funcionalidades y mejoras.
+

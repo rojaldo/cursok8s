@@ -1,0 +1,780 @@
+# ============================================================================
+# CRONJOB DE KUBERNETES - EJEMPLO COMPLETO CON TODOS LOS APARTADOS
+# ============================================================================
+# Un CronJob crea Jobs en un horario recurrente basado en formato Cron.
+# Ideal para tareas programadas: backups, reportes, limpieza, sincronización, etc.
+# ============================================================================
+
+# Versión de la API
+apiVersion: batch/v1
+
+# Tipo de recurso
+kind: CronJob
+
+# ============================================================================
+# METADATA: Información de identificación del CronJob
+# ============================================================================
+metadata:
+  # Nombre único del CronJob
+  name: mi-cronjob-backup
+  
+  # Namespace
+  namespace: default
+  
+  # Labels del CronJob
+  labels:
+    app: backup-system
+    type: scheduled
+    category: maintenance
+    frequency: daily
+  
+  # Annotations
+  annotations:
+    description: "CronJob para backup diario de la base de datos"
+    contact: "devops@empresa.com"
+    schedule-description: "Todos los días a las 2:00 AM UTC"
+    estimated-duration: "15m"
+
+# ============================================================================
+# SPEC: Especificación del CronJob
+# ============================================================================
+spec:
+  # ========================================================================
+  # SCHEDULE: Expresión Cron que define cuándo ejecutar
+  # ========================================================================
+  # Formato: "minute hour day-of-month month day-of-week"
+  # Ejemplos:
+  # - "*/5 * * * *"      → Cada 5 minutos
+  # - "0 * * * *"        → Cada hora en punto
+  # - "0 0 * * *"        → Diariamente a medianoche
+  # - "0 2 * * *"        → Diariamente a las 2:00 AM
+  # - "0 0 * * 0"        → Semanalmente los domingos a medianoche
+  # - "0 0 1 * *"        → Mensualmente el día 1 a medianoche
+  # - "0 9 * * 1-5"      → Días laborables a las 9:00 AM
+  # - "30 2 * * *"       → Diariamente a las 2:30 AM
+  # - "0 */6 * * *"      → Cada 6 horas
+  # - "0 0,12 * * *"     → Dos veces al día (medianoche y mediodía)
+  schedule: "0 2 * * *"  # Diariamente a las 2:00 AM UTC
+  
+  # ========================================================================
+  # TIMEZONE
+  # ========================================================================
+  # Zona horaria para interpretar el schedule (Kubernetes 1.25+)
+  # Si no se especifica, usa UTC
+  # Ejemplos: "America/New_York", "Europe/Madrid", "Asia/Tokyo"
+  timeZone: "UTC"
+  
+  # ========================================================================
+  # STARTING DEADLINE SECONDS
+  # ========================================================================
+  # Deadline en segundos para iniciar el Job si se pierde el horario programado
+  # - Si el Job no puede iniciarse dentro de este deadline, se cuenta como fallido
+  # - Útil para evitar acumulación de Jobs si el cluster está caído
+  # - Si no se especifica, no hay deadline
+  startingDeadlineSeconds: 300  # 5 minutos
+  
+  # ========================================================================
+  # CONCURRENCY POLICY
+  # ========================================================================
+  # Política para manejar ejecuciones concurrentes
+  # - Allow (default): permite múltiples Jobs ejecutándose simultáneamente
+  # - Forbid: no permite concurrencia, omite nueva ejecución si la anterior aún corre
+  # - Replace: cancela el Job actual y lo reemplaza con uno nuevo
+  concurrencyPolicy: Forbid
+  
+  # ========================================================================
+  # SUSPEND
+  # ========================================================================
+  # Suspender el CronJob (no crea nuevos Jobs)
+  # - true: suspendido (no se crearán nuevos Jobs)
+  # - false: activo normal
+  # Útil para mantenimiento o pausar temporalmente sin eliminar el CronJob
+  suspend: false
+  
+  # ========================================================================
+  # SUCCESSFUL JOBS HISTORY LIMIT
+  # ========================================================================
+  # Número de Jobs completados exitosamente que se mantienen en el historial
+  # Por defecto es 3
+  successfulJobsHistoryLimit: 3
+  
+  # ========================================================================
+  # FAILED JOBS HISTORY LIMIT
+  # ========================================================================
+  # Número de Jobs fallidos que se mantienen en el historial
+  # Por defecto es 1
+  failedJobsHistoryLimit: 2
+  
+  # ========================================================================
+  # JOB TEMPLATE: Plantilla del Job que se creará
+  # ========================================================================
+  # Esta es la especificación del Job que se creará en cada ejecución
+  jobTemplate:
+    # Metadata del Job
+    metadata:
+      # Labels del Job
+      labels:
+        app: backup-system
+        type: scheduled
+        cronjob: mi-cronjob-backup
+      
+      # Annotations del Job
+      annotations:
+        scheduled-by: "mi-cronjob-backup"
+    
+    # Spec del Job (igual que un Job normal)
+    spec:
+      # Número de completaciones requeridas
+      completions: 1
+      
+      # Paralelismo
+      parallelism: 1
+      
+      # Límite de reintentos
+      backoffLimit: 3
+      
+      # Deadline activo
+      activeDeadlineSeconds: 1800  # 30 minutos máximo
+      
+      # TTL para limpieza automática
+      ttlSecondsAfterFinished: 86400  # 24 horas
+      
+      # ==================================================================
+      # TEMPLATE DEL POD
+      # ==================================================================
+      template:
+        metadata:
+          labels:
+            app: backup-system
+            cronjob: mi-cronjob-backup
+          annotations:
+            prometheus.io/scrape: "false"
+        
+        spec:
+          # ============================================================
+          # CONTENEDORES
+          # ============================================================
+          containers:
+          - name: backup
+            image: postgres:14-alpine
+            imagePullPolicy: IfNotPresent
+            
+            # Comando del backup
+            command:
+            - /bin/bash
+            - -c
+            
+            args:
+            - |
+              #!/bin/bash
+              set -e
+              
+              echo "=========================================="
+              echo "Iniciando backup programado"
+              echo "Fecha: $(date)"
+              echo "CronJob: $CRONJOB_NAME"
+              echo "=========================================="
+              
+              # Generar nombre de archivo con timestamp
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_FILE="backup_${TIMESTAMP}.sql"
+              
+              echo "Conectando a base de datos..."
+              
+              # Realizar backup de PostgreSQL
+              pg_dump \
+                -h $DB_HOST \
+                -U $DB_USER \
+                -d $DB_NAME \
+                -F c \
+                -f /backup/$BACKUP_FILE
+              
+              echo "Backup creado: $BACKUP_FILE"
+              
+              # Comprimir backup
+              gzip /backup/$BACKUP_FILE
+              echo "Backup comprimido: ${BACKUP_FILE}.gz"
+              
+              # Subir a S3 (requiere aws-cli)
+              if command -v aws &> /dev/null; then
+                echo "Subiendo a S3..."
+                aws s3 cp /backup/${BACKUP_FILE}.gz \
+                  s3://$S3_BUCKET/backups/postgres/${BACKUP_FILE}.gz
+                echo "Backup subido a S3 exitosamente"
+              fi
+              
+              # Limpiar backups locales antiguos (>7 días)
+              find /backup -name "backup_*.sql.gz" -mtime +7 -delete
+              echo "Backups antiguos eliminados"
+              
+              echo "=========================================="
+              echo "Backup completado exitosamente"
+              echo "=========================================="
+            
+            # Variables de entorno
+            env:
+            - name: CRONJOB_NAME
+              value: mi-cronjob-backup
+            
+            - name: DB_HOST
+              value: postgres-service
+            
+            - name: DB_NAME
+              value: mydb
+            
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: backup-config
+                  key: s3-bucket
+            
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: access-key-id
+            
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: secret-access-key
+            
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            
+            # Timestamp de ejecución
+            - name: EXECUTION_TIME
+              value: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            
+            # Recursos
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+                ephemeral-storage: "5Gi"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+                ephemeral-storage: "10Gi"
+            
+            # Montaje de volúmenes
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            
+            - name: backup-scripts
+              mountPath: /scripts
+              readOnly: true
+            
+            - name: tmp
+              mountPath: /tmp
+            
+            # Contexto de seguridad
+            securityContext:
+              runAsUser: 999
+              runAsGroup: 999
+              runAsNonRoot: true
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+              seccompProfile:
+                type: RuntimeDefault
+          
+          # Contenedor sidecar para notificaciones
+          - name: notifier
+            image: curlimages/curl:latest
+            imagePullPolicy: IfNotPresent
+            
+            command:
+            - /bin/sh
+            - -c
+            
+            args:
+            - |
+              # Esperar a que el backup termine
+              sleep 10
+              
+              # Verificar si el backup fue exitoso
+              if [ -f /backup/success.flag ]; then
+                STATUS="SUCCESS"
+                MESSAGE="Backup completado exitosamente"
+              else
+                STATUS="FAILED"
+                MESSAGE="Backup falló"
+              fi
+              
+              # Enviar notificación a Slack
+              curl -X POST $SLACK_WEBHOOK \
+                -H 'Content-Type: application/json' \
+                -d "{
+                  \"text\": \"Backup Status: $STATUS\",
+                  \"attachments\": [{
+                    \"color\": \"good\",
+                    \"text\": \"$MESSAGE\",
+                    \"fields\": [{
+                      \"title\": \"CronJob\",
+                      \"value\": \"mi-cronjob-backup\",
+                      \"short\": true
+                    }]
+                  }]
+                }"
+            
+            env:
+            - name: SLACK_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: notification-secrets
+                  key: slack-webhook
+            
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+              readOnly: true
+            
+            resources:
+              requests:
+                memory: "32Mi"
+                cpu: "50m"
+              limits:
+                memory: "64Mi"
+                cpu: "100m"
+          
+          # ============================================================
+          # INIT CONTAINERS
+          # ============================================================
+          initContainers:
+          # Verificar conectividad a la base de datos
+          - name: init-check-db
+            image: busybox:1.35
+            command:
+            - sh
+            - -c
+            - |
+              echo "Verificando conectividad a base de datos..."
+              until nc -zv $DB_HOST 5432; do
+                echo "Esperando base de datos..."
+                sleep 2
+              done
+              echo "Base de datos disponible"
+            env:
+            - name: DB_HOST
+              value: postgres-service
+            resources:
+              requests:
+                memory: "32Mi"
+                cpu: "50m"
+              limits:
+                memory: "64Mi"
+                cpu: "100m"
+          
+          # Preparar directorio de backup
+          - name: init-prepare-backup-dir
+            image: busybox:1.35
+            command:
+            - sh
+            - -c
+            - |
+              mkdir -p /backup
+              chmod 755 /backup
+              echo "Directorio de backup preparado"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            securityContext:
+              runAsUser: 0  # Necesita root para crear directorio
+          
+          # ============================================================
+          # VOLÚMENES
+          # ============================================================
+          volumes:
+          # PersistentVolumeClaim para almacenar backups
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+          
+          # ConfigMap con scripts de backup
+          - name: backup-scripts
+            configMap:
+              name: backup-scripts
+              defaultMode: 0755
+          
+          # Volumen temporal
+          - name: tmp
+            emptyDir: {}
+          
+          # Secret con credenciales
+          - name: credentials
+            secret:
+              secretName: backup-credentials
+              defaultMode: 0400
+          
+          # ============================================================
+          # RESTART POLICY
+          # ============================================================
+          # CronJobs solo permiten OnFailure o Never
+          restartPolicy: OnFailure
+          
+          # ============================================================
+          # SERVICE ACCOUNT
+          # ============================================================
+          serviceAccountName: backup-service-account
+          automountServiceAccountToken: true
+          
+          # ============================================================
+          # SECURITY CONTEXT
+          # ============================================================
+          securityContext:
+            fsGroup: 999
+            runAsUser: 999
+            runAsGroup: 999
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          
+          # ============================================================
+          # SCHEDULING
+          # ============================================================
+          
+          # Selector de nodos para backups
+          nodeSelector:
+            workload-type: batch
+            storage-access: enabled
+          
+          # Tolerations para nodos batch
+          tolerations:
+          - key: "batch-workload"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          - key: "spot-instance"
+            operator: "Equal"
+            value: "true"
+            effect: "NoSchedule"
+          
+          # Prioridad
+          priorityClassName: system-cluster-critical
+          
+          # Afinidad
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                preference:
+                  matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values:
+                    - storage-optimized
+          
+          # ============================================================
+          # OTRAS CONFIGURACIONES
+          # ============================================================
+          imagePullSecrets:
+          - name: registry-credentials
+          
+          terminationGracePeriodSeconds: 30
+          
+          dnsPolicy: ClusterFirst
+          
+          enableServiceLinks: false
+
+# ============================================================================
+# STATUS: Estado del CronJob (solo lectura, gestionado por Kubernetes)
+# ============================================================================
+# status:
+#   active:
+#   - apiVersion: batch/v1
+#     kind: Job
+#     name: mi-cronjob-backup-28366820
+#     namespace: default
+#     uid: 12345678-1234-1234-1234-123456789012
+#   lastScheduleTime: 2025-10-27T02:00:00Z
+#   lastSuccessfulTime: 2025-10-27T02:15:00Z
+
+---
+# ============================================================================
+# EJEMPLOS DE DIFERENTES CRONJOBS
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# EJEMPLO 1: BACKUP DIARIO A MEDIANOCHE
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-backup
+spec:
+  schedule: "0 0 * * *"  # Medianoche todos los días
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: backup-tool:latest
+            command: ["./backup.sh"]
+          restartPolicy: OnFailure
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 2: LIMPIEZA CADA 6 HORAS
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-temp-files
+spec:
+  schedule: "0 */6 * * *"  # Cada 6 horas
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cleanup
+            image: busybox:1.35
+            command:
+            - sh
+            - -c
+            - find /tmp -type f -atime +7 -delete
+          restartPolicy: OnFailure
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 3: REPORTE SEMANAL (DOMINGOS)
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: weekly-report
+spec:
+  schedule: "0 9 * * 0"  # Domingos a las 9:00 AM
+  timeZone: "America/New_York"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: report-generator
+            image: python:3.11-slim
+            command: ["python", "/scripts/generate-report.py"]
+            volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+          volumes:
+          - name: scripts
+            configMap:
+              name: report-scripts
+          restartPolicy: OnFailure
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 4: SINCRONIZACIÓN CADA 5 MINUTOS
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: data-sync
+spec:
+  schedule: "*/5 * * * *"  # Cada 5 minutos
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: sync
+            image: rsync:latest
+            command: ["rsync", "-avz", "/source", "/dest"]
+          restartPolicy: Never
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 5: REPORTE MENSUAL (PRIMER DÍA DEL MES)
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: monthly-report
+spec:
+  schedule: "0 0 1 * *"  # Día 1 de cada mes a medianoche
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: report
+            image: report-generator:latest
+            env:
+            - name: REPORT_TYPE
+              value: "monthly"
+            - name: REPORT_MONTH
+              value: "$(date +%Y-%m)"
+          restartPolicy: OnFailure
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 6: LIMPIEZA DE LOGS DÍAS LABORABLES
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: weekday-log-cleanup
+spec:
+  schedule: "0 1 * * 1-5"  # Lunes a Viernes a la 1:00 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cleanup
+            image: busybox:1.35
+            command:
+            - sh
+            - -c
+            - |
+              echo "Limpiando logs antiguos..."
+              find /logs -name "*.log" -mtime +30 -delete
+              echo "Limpieza completada"
+          restartPolicy: OnFailure
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 7: HEALTHCHECK CADA HORA
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hourly-healthcheck
+spec:
+  schedule: "0 * * * *"  # Cada hora en punto
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: healthcheck
+            image: curlimages/curl:latest
+            command:
+            - sh
+            - -c
+            - |
+              for service in api web database; do
+                curl -f http://$service/health || exit 1
+              done
+          restartPolicy: Never
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 8: BACKUP CON MÚLTIPLES HORARIOS
+# ----------------------------------------------------------------------------
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: multi-schedule-backup
+spec:
+  schedule: "0 0,12 * * *"  # A medianoche y mediodía
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: backup-tool:latest
+            env:
+            - name: BACKUP_TIME
+              value: "$(date +%H)"
+          restartPolicy: OnFailure
+
+# ============================================================================
+# EXPRESIONES CRON COMUNES
+# ============================================================================
+# Minuto Hora DíaMes Mes DíaSemana
+#
+# */5 * * * *           → Cada 5 minutos
+# 0 * * * *             → Cada hora
+# 0 */2 * * *           → Cada 2 horas
+# 0 0 * * *             → Diariamente a medianoche
+# 0 2 * * *             → Diariamente a las 2 AM
+# 0 0 * * 0             → Semanalmente (domingos)
+# 0 0 * * 1-5           → Días laborables
+# 0 0 1 * *             → Mensualmente (día 1)
+# 0 0 1 1 *             → Anualmente (1 de enero)
+# 0 9-17 * * 1-5        → Horas laborables (9-17h lun-vie)
+# 0,30 * * * *          → Dos veces por hora (:00 y :30)
+# 0 0,6,12,18 * * *     → Cuatro veces al día
+
+# ============================================================================
+# NOTAS IMPORTANTES SOBRE CRONJOBS
+# ============================================================================
+# 1. FORMATO CRON:
+#    - Usa 5 campos: minuto hora día-mes mes día-semana
+#    - Rango: minutos (0-59), horas (0-23), días (1-31), meses (1-12), día-semana (0-6)
+#    - Operadores: * (cualquier), , (lista), - (rango), / (paso)
+#
+# 2. TIMEZONE:
+#    - Por defecto usa UTC
+#    - Kubernetes 1.25+ soporta timeZone field
+#    - CRÍTICO: considerar horarios de verano (DST)
+#
+# 3. CONCURRENCY POLICY:
+#    - Allow: múltiples ejecuciones simultáneas
+#    - Forbid: solo una ejecución a la vez
+#    - Replace: cancela y reemplaza ejecución actual
+#
+# 4. STARTING DEADLINE:
+#    - Evita acumulación de Jobs si el cluster está caído
+#    - Si se pierden múltiples ejecuciones, solo ejecuta una
+#
+# 5. HISTORIAL:
+#    - successfulJobsHistoryLimit: mantiene Jobs exitosos
+#    - failedJobsHistoryLimit: mantiene Jobs fallidos
+#    - Ayuda en debugging pero consume recursos
+#
+# 6. SUSPEND:
+#    - Pausa el CronJob sin eliminarlo
+#    - No afecta Jobs ya en ejecución
+#    - Útil para mantenimiento
+#
+# 7. CASOS DE USO:
+#    - Backups programados
+#    - Generación de reportes
+#    - Limpieza de datos
+#    - Sincronización
+#    - Monitoreo y healthchecks
+#    - Procesamiento batch
+#
+# 8. CONSIDERACIONES:
+#    - Los CronJobs NO garantizan ejecución exacta
+#    - Puede haber retraso de segundos o minutos
+#    - Diseñar Jobs idempotentes
+#    - Manejar ejecuciones duplicadas (rare pero posible)
+#
+# 9. MONITOREO:
+#    - Verificar lastScheduleTime en status
+#    - Alertar si lastSuccessfulTime está muy antiguo
+#    - Revisar Jobs fallidos regularmente
+
+# ============================================================================
+# FIN DEL CRONJOB
+# ============================================================================

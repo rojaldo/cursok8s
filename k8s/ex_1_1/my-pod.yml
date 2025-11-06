@@ -1,0 +1,16 @@
+# Crea un pod que monte un volumen de tipo emptyDir y escribe un archivo dentro del volumen desde el contenedor principal.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+spec:
+  containers:
+  - name: main-container
+    image: ubuntu
+    command: ["/bin/sh", "-c", "echo 'Hello from the main container!' > /mnt/data/hello.txt && sleep 3600", "cat /mnt/data/hello.txt"]
+    volumeMounts:
+    - name: my-emptydir
+      mountPath: /mnt/data
+  volumes:
+  - name: my-emptydir
+    emptyDir: {}

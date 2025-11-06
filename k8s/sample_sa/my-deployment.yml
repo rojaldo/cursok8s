@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mi-app
+  namespace: produccion
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mi-app
+  template:
+    metadata:
+      labels:
+        app: mi-app
+    spec:
+      serviceAccountName: mi-app-sa
+      containers:
+        - name: app
+          image: docker.io/library/nginx

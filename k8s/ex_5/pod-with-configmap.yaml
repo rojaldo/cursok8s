@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-configmap-example
+spec:
+  containers:
+  - name: node-app
+    image: node-log-app
+    envFrom:
+    - configMapRef:
+        name: app-config
+    volumeMounts:
+    - name: shared-logs
+      mountPath: /app/logs
+  - name: log-watcher
+    image: busybox
+    command: ["/bin/sh", "-c", "tail -f /app/logs/app.log"]
+    volumeMounts:
+    - name: shared-logs
+      mountPath: /app/logs
+  volumes:
+  - name: shared-logs
+    emptyDir: {}

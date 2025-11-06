@@ -1,0 +1,101 @@
+= Ejercicios Prácticos de Docker
+
+A continuación se presentan 20 enunciados de ejercicios prácticos y originales para trabajar con diferentes conceptos de Docker: gestión de contenedores, imágenes, volúmenes y redes.
+
+== Gestión de Contenedores
+
+1.1. Ejecuta un contenedor basado en la imagen oficial de Alpine Linux y muestra el mensaje "Hola Docker" usando el comando `echo`.
+1.2. Crea un contenedor en modo interactivo con Ubuntu, instala el paquete `curl` y verifica su funcionamiento dentro del contenedor.
+1.3. Lanza un contenedor de Nginx en segundo plano, verifica que esté corriendo y deténlo usando el comando adecuado.
+1.4. Renombra un contenedor en ejecución y comprueba que el cambio se ha realizado correctamente.
+1.5. Elimina todos los contenedores detenidos de tu sistema con un solo comando.
+
+== Imágenes
+
+2.6. Descarga la imagen oficial de Redis y verifica que está disponible localmente.
+2.7. Construye una imagen personalizada de Node.js que incluya una aplicación simple que responda "Hola Mundo" en el puerto 3000.
+2.8. Modifica un Dockerfile para que tu imagen personalizada de Python incluya la instalación de la librería `requests`.
+2.9. Sube una imagen personalizada a Docker Hub usando tu cuenta personal.
+2.10. Utiliza el comando `docker history` para analizar las capas de una imagen oficial de MySQL.
+
+== Volúmenes
+
+3.11. Crea un volumen llamado `datos_web` y úsalo para almacenar archivos estáticos de un contenedor Ngin3.
+3.12. Lanza un contenedor de MongoDB que persista los datos en un volumen e3terno y verifica que los datos se mantienen tras reiniciar el contenedor.
+3.13. Comparte un volumen entre dos contenedores para que ambos puedan leer y escribir en el mismo directorio.
+3.14. Realiza una copia de seguridad de los datos almacenados en un volumen de Docker usando un contenedor temporal.
+3.15. Elimina un volumen que ya no esté siendo utilizado por ningún contenedor.
+
+== Redes
+
+4.16. Crea una red personalizada llamada `red_app` y conecta dos contenedores (uno de backend y otro de frontend) a esa red.
+4.17. Lanza un contenedor de MySQL y otro de WordPress en la misma red personalizada para que puedan comunicarse entre sí.
+4.18. Usa Docker Compose para definir una aplicación multicontenedor con una red propia y verifica la conectividad entre servicios.
+4.19. Cambia la configuración de red de un contenedor en ejecución para conectarlo a una segunda red.
+4.20. Inspecciona la configuración de una red de Docker y explica el significado de los parámetros mostrados.
+
+== Ejercicios con Dockerfile
+
+5.1. Crea un Dockerfile que construya una imagen basada en Alpine Linux, copie un archivo `index.html` local al contenedor y sirva el archivo usando el servidor web `httpd` en el puerto 80.
+
+5.2. Escribe un Dockerfile para una aplicación Python que instale las dependencias listadas en `requirements.txt`, copie el código fuente y ejecute el archivo principal `app.py` al iniciar el contenedor.
+
+5.3. Modifica un Dockerfile para que utilice variables de entorno definidas en tiempo de construcción y las imprima al iniciar el contenedor.
+
+5.4. Construye un Dockerfile multi-stage para una aplicación React: en la primera etapa compila el código fuente y en la segunda sirve los archivos estáticos con Nginx.
+
+5.5. Crea un Dockerfile que añada un usuario no root al contenedor y ejecute la aplicación bajo ese usuario por motivos de seguridad.
+
+5.6. Escribe un Dockerfile que utilice la instrucción `ENTRYPOINT` para que el contenedor siempre ejecute un script de inicialización antes de lanzar la aplicación principal.
+
+5.7. Modifica un Dockerfile para que utilice la caché de Docker de forma eficiente, separando la instalación de dependencias de la copia del código fuente.
+
+5.8. Crea un Dockerfile que descargue y configure una aplicación Go, compile el binario y lo ejecute en un contenedor minimalista basado en `scratch` o `alpine`.
+
+5.9. Escribe un Dockerfile que incluya instrucciones para copiar archivos de configuración desde un directorio local y permita sobreescribirlos mediante volúmenes al ejecutar el contenedor.
+
+5.10. Construye un Dockerfile que utilice la instrucción `HEALTHCHECK` para monitorizar el estado de la aplicación y defina una acción personalizada en caso de fallo.
+
+== Ejercicios con Docker Compose
+
+6.1. Crea un archivo `docker-compose.yml` que levante un servicio web con Nginx y una base de datos MySQL, configurando las variables de entorno necesarias para la base de datos y exponiendo los puertos adecuados para ambos servicios.
+
+6.2. Define una aplicación multicontenedor con Docker Compose que incluya un backend en Node.js y un frontend en React, conectados a través de una red personalizada y con volúmenes para persistencia de datos y hot-reload del código fuente.
+
+6.3. Modifica un archivo `docker-compose.yml` para que un servicio de Redis utilice un volumen persistente y otro servicio Python pueda conectarse a Redis usando el nombre del servicio como hostname.
+
+6.4. Implementa un entorno de desarrollo con Docker Compose que incluya una aplicación Django, una base de datos PostgreSQL y un servicio de administración de base de datos como pgAdmin, todos conectados en la misma red.
+
+6.5. Configura un archivo `docker-compose.yml` que utilice variables de entorno definidas en un archivo `.env` externo para parametrizar los puertos, contraseñas y rutas de volúmenes de los servicios.
+
+6.6. Añade una política de reinicio (`restart: always`) a los servicios de un archivo `docker-compose.yml` y comprueba el comportamiento de los contenedores tras reiniciar el sistema anfitrión.
+
+6.7. Define un servicio en Docker Compose que utilice la instrucción `depends_on` para asegurar que la base de datos esté disponible antes de iniciar la aplicación principal.
+
+6.8. Crea un archivo `docker-compose.yml` que levante un clúster de MongoDB con un nodo primario y dos secundarios, utilizando redes y volúmenes para la persistencia y comunicación entre nodos.
+
+6.9. Implementa un balanceador de carga con Nginx y varios servicios de backend en un archivo `docker-compose.yml`, configurando la red para que Nginx distribuya el tráfico entre los backends.
+
+6.10. Utiliza Docker Compose para levantar un entorno de pruebas automatizadas, donde un servicio ejecuta los tests y otro servicio simula una base de datos temporal, eliminando los contenedores y volúmenes al finalizar las pruebas.
+
+== Ejercicios Avanzados de Docker
+
+7.1. Crea una imagen multi-stage para una aplicación Node.js que compile el código fuente en una etapa y solo incluya los archivos necesarios en la imagen final, optimizando el tamaño de la imagen.
+
+7.2. Implementa un sistema de logs centralizados usando Docker Compose, donde los contenedores de una aplicación web envíen sus logs a un contenedor de Elasticsearch y visualízalos con Kibana.
+
+7.3. Configura un clúster de Redis en modo replicado utilizando Docker Compose y redes personalizadas, asegurando la persistencia de datos y la comunicación entre nodos.
+
+7.4. Despliega una aplicación web con balanceo de carga utilizando Nginx como proxy inverso y varios contenedores de backend, gestionando el escalado horizontal con Docker Compose.
+
+7.5. Utiliza Docker Secrets para gestionar credenciales sensibles en un entorno de Docker Swarm, desplegando un stack que incluya una base de datos y una aplicación que acceda a las credenciales de forma segura.
+
+7.6. Automatiza la construcción y despliegue de imágenes Docker usando GitHub Actions, de modo que cada push a la rama principal genere una nueva imagen y la suba a Docker Hub.
+
+7.7. Crea un entorno de desarrollo reproducible para una aplicación Python, utilizando Docker Compose para definir servicios de base de datos, caché y la propia aplicación, con volúmenes para persistencia y hot-reload del código.
+
+7.8. Implementa una política de recursos en Docker (CPU y memoria) para limitar el consumo de un contenedor y verifica su comportamiento bajo carga.
+
+7.9. Realiza una migración de datos entre dos contenedores de bases de datos PostgreSQL utilizando volúmenes y contenedores temporales para exportar e importar los datos.
+
+7.10. Configura un entorno de integración continua local usando Jenkins en Docker, donde Jenkins gestione la construcción y pruebas de otras aplicaciones contenidas en Docker.

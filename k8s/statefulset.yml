@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+ name: ejemplo-statefulset
+spec:
+ serviceName: "mi-aplicacion"
+ replicas: 3
+ selector:
+   matchLabels:
+     app: mi-aplicacion
+ template:
+   metadata:
+     labels:
+       app: mi-aplicacion
+   spec:
+     containers:
+     - name: mi-bbdd
+       image: mysql:latest
+       ports:
+       - containerPort: 3306
+ volumeClaimTemplates:
+ - metadata:
+     name: almacenamiento
+   spec:
+     accessModes: [ "ReadWriteOnce" ]
+     resources:
+       requests:
+         storage: 1Gi

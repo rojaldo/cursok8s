@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nginx-probe-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: probe-container
+        image: curlimages/curl:latest
+        command: ["sh", "-c"]
+        args:
+        - |
+          echo "Testing nginx-service connectivity..."
+          if curl -f -s http://10.109.61.136 | grep -i html; then
+            echo "SUCCESS: nginx-service is responding with HTML content"
+            exit 0
+          else
+            echo "FAILED: nginx-service is not responding with HTML content"
+            exit 1
+          fi
+      restartPolicy: Never
+  backoffLimit: 3

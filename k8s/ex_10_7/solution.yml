@@ -1,0 +1,52 @@
+# ubuntu interactive pod that mounts an emptyDir volume
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu-interactive-3
+spec:
+  containers:
+  - name: ubuntu
+    image: ubuntu:latest
+    command: ["/bin/bash", "-c", "tail -f /dev/null"]
+    volumeMounts:
+    - name: data-volume
+      mountPath: /data
+    - name: backup-volume
+      mountPath: /backup
+    stdin: true
+    tty: true
+  volumes:
+  - name: data-volume
+    emptyDir: {}
+  - name: backup-volume
+    emptyDir: {}
+  restartPolicy: Never
+---
+
+# a job that makes a backup of the data in the emptyDir volume to backup
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: backup
+        image: ubuntu:latest
+        command: ["/bin/bash", "-c", "cp -r /data/* /backup/"]
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        - name: backup-volume
+          mountPath: /backup
+      restartPolicy: Never
+      volumes:
+      - name: data-volume
+        emptyDir: {}
+      - name: backup-volume
+        emptyDir: {}
+  backoffLimit: 4
+  completions: 1
+  parallelism: 1
+  activeDeadlineSeconds: 100

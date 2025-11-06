@@ -1,0 +1,483 @@
+# ============================================================================
+# SERVICE DE KUBERNETES - EJEMPLO COMPLETO CON TODOS LOS APARTADOS
+# ============================================================================
+# Un Service proporciona una forma estable de exponer aplicaciones que se
+# ejecutan en un conjunto de Pods. Define una política de acceso a los Pods.
+# ============================================================================
+
+# Versión de la API
+apiVersion: v1
+
+# Tipo de recurso
+kind: Service
+
+# ============================================================================
+# METADATA: Información de identificación del Service
+# ============================================================================
+metadata:
+  # Nombre único del Service
+  name: mi-servicio
+  
+  # Namespace
+  namespace: default
+  
+  # Labels del Service
+  labels:
+    app: mi-aplicacion
+    tier: backend
+    version: v1
+    environment: production
+  
+  # Annotations
+  annotations:
+    description: "Service principal de la aplicación"
+    contact: "devops@empresa.com"
+    
+    # Annotations específicas de cloud providers
+    # AWS Load Balancer annotations
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-internal: "false"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:us-east-1:123456789:certificate/abc123"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    
+    # Azure Load Balancer annotations
+    service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+    service.beta.kubernetes.io/azure-dns-label-name: "mi-aplicacion"
+    
+    # GCP Load Balancer annotations
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"ports": {"80":"my-backendconfig"}}'
+    
+    # Prometheus annotations
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+
+# ============================================================================
+# SPEC: Especificación del Service
+# ============================================================================
+spec:
+  # ========================================================================
+  # TIPO DE SERVICE
+  # ========================================================================
+  # - ClusterIP (default): Expone el Service internamente en el cluster
+  # - NodePort: Expone el Service en cada nodo mediante un puerto estático
+  # - LoadBalancer: Expone el Service externamente mediante un load balancer
+  # - ExternalName: Mapea el Service a un nombre DNS externo
+  type: ClusterIP
+  
+  # ========================================================================
+  # SELECTOR: Define qué Pods reciben tráfico de este Service
+  # ========================================================================
+  # El Service enruta tráfico a Pods que coincidan con TODAS estas labels
+  selector:
+    app: mi-aplicacion
+    tier: backend
+  
+  # ========================================================================
+  # PORTS: Definición de puertos del Service
+  # ========================================================================
+  ports:
+  # Puerto HTTP
+  - name: http
+    # Protocolo: TCP (default), UDP, SCTP
+    protocol: TCP
+    # Puerto en el que el Service está disponible
+    port: 80
+    # Puerto en el contenedor al que se envía el tráfico
+    targetPort: 8080  # Puede ser número o nombre del puerto del contenedor
+    # NodePort: puerto estático en cada nodo (solo para NodePort/LoadBalancer)
+    # Rango válido: 30000-32767
+    # nodePort: 30080
+    # AppProtocol: protocolo de aplicación (HTTP, HTTPS, etc.)
+    appProtocol: http
+  
+  # Puerto HTTPS
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: 8443
+    # nodePort: 30443
+    appProtocol: https
+  
+  # Puerto de métricas
+  - name: metrics
+    protocol: TCP
+    port: 9090
+    targetPort: metrics  # Usando nombre del puerto del contenedor
+  
+  # Puerto gRPC
+  - name: grpc
+    protocol: TCP
+    port: 50051
+    targetPort: 50051
+    appProtocol: grpc
+  
+  # ========================================================================
+  # CLUSTER IP
+  # ========================================================================
+  # IP interna del cluster asignada al Service
+  # - Dejar vacío para asignación automática
+  # - "None" para crear un servicio headless (sin load balancing)
+  # - Especificar IP específica (debe estar en el rango del cluster)
+  clusterIP: ""  # Asignación automática
+  # clusterIP: None  # Para headless service
+  # clusterIP: 10.96.0.100  # IP específica
+  
+  # ========================================================================
+  # CLUSTER IPS (para dual-stack IPv4/IPv6)
+  # ========================================================================
+  # Lista de IPs para configuración dual-stack
+  # clusterIPs:
+  # - 10.96.0.100    # IPv4
+  # - fd00::1234      # IPv6
+  
+  # ========================================================================
+  # IP FAMILIES
+  # ========================================================================
+  # Familias de IP soportadas por el Service
+  # - IPv4
+  # - IPv6
+  ipFamilies:
+  - IPv4
+  # - IPv6  # Para dual-stack
+  
+  # Política de familia IP
+  # - SingleStack: solo una familia IP
+  # - PreferDualStack: dual-stack si está disponible, sino single-stack
+  # - RequireDualStack: requiere dual-stack
+  ipFamilyPolicy: SingleStack
+  
+  # ========================================================================
+  # SESSION AFFINITY
+  # ========================================================================
+  # Afinidad de sesión para mantener conexiones al mismo Pod
+  # - None (default): sin afinidad
+  # - ClientIP: afinidad basada en IP del cliente
+  sessionAffinity: ClientIP
+  
+  # Configuración de afinidad de sesión
+  sessionAffinityConfig:
+    clientIP:
+      # Tiempo en segundos que dura la afinidad (máximo 86400 = 24h)
+      timeoutSeconds: 10800  # 3 horas
+  
+  # ========================================================================
+  # EXTERNAL IPS
+  # ========================================================================
+  # Lista de IPs externas que aceptan tráfico para este Service
+  # Útil para enrutar tráfico de IPs específicas al Service
+  externalIPs:
+  - 80.11.12.10
+  - 80.11.12.11
+  
+  # ========================================================================
+  # EXTERNAL TRAFFIC POLICY
+  # ========================================================================
+  # Política de tráfico externo (solo para NodePort y LoadBalancer)
+  # - Cluster (default): balancea a todos los Pods sanos en todo el cluster
+  # - Local: solo envía a Pods en el nodo que recibe el tráfico
+  #   Ventajas de Local: preserva IP origen, reduce saltos
+  #   Desventajas de Local: distribución desigual si Pods no están en todos los nodos
+  externalTrafficPolicy: Cluster
+  
+  # ========================================================================
+  # INTERNAL TRAFFIC POLICY
+  # ========================================================================
+  # Política de tráfico interno (Kubernetes 1.22+)
+  # - Cluster (default): balancea a todos los Pods
+  # - Local: prefiere Pods en el mismo nodo
+  internalTrafficPolicy: Cluster
+  
+  # ========================================================================
+  # HEALTH CHECK NODE PORT
+  # ========================================================================
+  # Puerto para health checks cuando externalTrafficPolicy es Local
+  # Solo aplicable para tipo LoadBalancer
+  # healthCheckNodePort: 30012
+  
+  # ========================================================================
+  # PUBLISH NOT READY ADDRESSES
+  # ========================================================================
+  # Si se deben publicar direcciones de Pods que no están Ready
+  # Útil para servicios headless y StatefulSets
+  publishNotReadyAddresses: false
+  
+  # ========================================================================
+  # ALLOCATE LOAD BALANCER NODE PORTS
+  # ========================================================================
+  # Si asignar NodePorts automáticamente para tipo LoadBalancer
+  # (Kubernetes 1.24+) Útil si el LB no necesita NodePorts
+  allocateLoadBalancerNodePorts: true
+  
+  # ========================================================================
+  # LOAD BALANCER CLASS
+  # ========================================================================
+  # Clase de load balancer a usar (Kubernetes 1.24+)
+  # Permite usar diferentes implementaciones de LB
+  # loadBalancerClass: "example.com/internal-lb"
+  
+  # ========================================================================
+  # LOAD BALANCER SOURCE RANGES
+  # ========================================================================
+  # Rangos CIDR permitidos para acceder al LoadBalancer
+  # Actúa como firewall a nivel de load balancer
+  loadBalancerSourceRanges:
+  - 10.0.0.0/8      # Red interna
+  - 172.16.0.0/12   # Red privada
+  - 192.168.0.0/16  # Red local
+  # - 0.0.0.0/0     # Todo Internet (usar con precaución)
+  
+  # ========================================================================
+  # LOAD BALANCER IP
+  # ========================================================================
+  # IP específica para el LoadBalancer (si es soportado por el proveedor)
+  # loadBalancerIP: 203.0.113.100
+  
+  # ========================================================================
+  # EXTERNAL NAME (solo para tipo ExternalName)
+  # ========================================================================
+  # Nombre DNS externo al que se mapea el Service
+  # Solo aplica cuando type es ExternalName
+  # externalName: api.external-service.com
+
+# ============================================================================
+# STATUS: Estado del Service (solo lectura, gestionado por Kubernetes)
+# ============================================================================
+# status:
+#   loadBalancer:
+#     ingress:
+#     - ip: 203.0.113.100
+#       hostname: a1234567890abcdef.us-east-1.elb.amazonaws.com
+#   conditions:
+#   - type: LoadBalancerReady
+#     status: "True"
+#     lastTransitionTime: 2025-10-27T10:00:00Z
+
+---
+# ============================================================================
+# EJEMPLOS DE DIFERENTES TIPOS DE SERVICES
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# EJEMPLO 1: SERVICE TIPO CLUSTERIP (por defecto)
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  sessionAffinity: None
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 2: SERVICE TIPO NODEPORT
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-nodeport
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    nodePort: 30080  # Accesible en <NodeIP>:30080
+    protocol: TCP
+  externalTrafficPolicy: Local  # Preserva IP origen
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 3: SERVICE TIPO LOADBALANCER
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-loadbalancer
+  namespace: default
+  annotations:
+    # AWS
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: api
+  ports:
+  - name: https
+    port: 443
+    targetPort: 8443
+    protocol: TCP
+  loadBalancerSourceRanges:
+  - 0.0.0.0/0  # Accesible desde Internet
+  externalTrafficPolicy: Local
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 4: SERVICE HEADLESS (para StatefulSets)
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: default
+spec:
+  clusterIP: None  # Headless - sin load balancing
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+    protocol: TCP
+  publishNotReadyAddresses: true  # Incluir Pods no ready
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 5: SERVICE TIPO EXTERNALNAME
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-api
+  namespace: default
+spec:
+  type: ExternalName
+  externalName: api.example.com  # DNS externo
+  # No usa selector ni ports
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 6: SERVICE CON MÚLTIPLES PUERTOS
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: multi-port-service
+  namespace: default
+spec:
+  selector:
+    app: microservice
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8443
+    protocol: TCP
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 7: SERVICE SIN SELECTOR (Endpoints manuales)
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-database
+  namespace: default
+spec:
+  # No tiene selector - endpoints definidos manualmente
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: 3306
+    protocol: TCP
+---
+# Endpoints correspondientes (se crean manualmente)
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-database  # DEBE coincidir con el nombre del Service
+  namespace: default
+subsets:
+- addresses:
+  - ip: 192.168.1.100  # IP de la base de datos externa
+  - ip: 192.168.1.101
+  ports:
+  - name: mysql
+    port: 3306
+    protocol: TCP
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 8: SERVICE CON SESSION AFFINITY
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: sticky-session-service
+  namespace: default
+spec:
+  selector:
+    app: webapp
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600  # 1 hora de afinidad
+
+# ============================================================================
+# NOTAS IMPORTANTES SOBRE SERVICES
+# ============================================================================
+# 1. DESCUBRIMIENTO DE SERVICIOS:
+#    - DNS: <service-name>.<namespace>.svc.cluster.local
+#    - Variables de entorno: automáticamente inyectadas en Pods
+#
+# 2. TIPOS DE SERVICE:
+#    - ClusterIP: solo accesible dentro del cluster
+#    - NodePort: accesible en <NodeIP>:<NodePort>
+#    - LoadBalancer: provisiona un LB externo (cloud)
+#    - ExternalName: alias DNS a servicios externos
+#
+# 3. SELECTORS:
+#    - Service sin selector: útil para servicios externos
+#    - Con selector: Kubernetes crea Endpoints automáticamente
+#
+# 4. HEADLESS SERVICES (clusterIP: None):
+#    - No hay load balancing
+#    - DNS devuelve IPs de todos los Pods
+#    - Útil para StatefulSets y descubrimiento de servicios
+#
+# 5. EXTERNAL TRAFFIC POLICY:
+#    - Cluster: balancea entre todos los Pods
+#    - Local: solo Pods locales (preserva IP origen)
+#
+# 6. SESSION AFFINITY:
+#    - ClientIP: mantiene conexiones del mismo cliente al mismo Pod
+#    - Útil para aplicaciones stateful
+#
+# 7. LOAD BALANCER:
+#    - Annotations específicas por proveedor cloud
+#    - Puede tardar varios minutos en provisionarse
+#    - Costo adicional en clouds públicos
+
+# ============================================================================
+# FIN DEL SERVICE
+# ============================================================================

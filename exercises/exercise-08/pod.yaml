@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-command-pod
+  labels:
+    app: init-demo
+spec:
+  containers:
+  - name: main-app
+    image: busybox:latest
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Running initialization script ==="
+        echo "Starting application setup..."
+
+        # Crear directorio de trabajo
+        mkdir -p /app/data
+
+        # Simular inicialización de base de datos
+        echo "Initializing database..." > /app/data/init.log
+        echo "Creating tables..." >> /app/data/init.log
+        echo "Seeding data..." >> /app/data/init.log
+
+        # Configurar archivos
+        echo "Setting up configuration files..."
+        cat > /app/data/config.json <<EOF
+        {
+          "app_name": "MyApp",
+          "version": "1.0.0",
+          "environment": "production"
+        }
+        EOF
+
+        echo "Initialization completed successfully!"
+        cat /app/data/init.log
+        echo ""
+        echo "Config file contents:"
+        cat /app/data/config.json
+
+        echo ""
+        echo "=== Application is now running ==="
+
+        # Mantener el pod en ejecución
+        while true; do
+          echo "[$(date)] Application running..."
+          sleep 30
+        done

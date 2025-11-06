@@ -1,0 +1,605 @@
+# ============================================================================
+# CONFIGMAP DE KUBERNETES - EJEMPLO COMPLETO CON TODOS LOS APARTADOS
+# ============================================================================
+# Un ConfigMap almacena datos de configuración no confidenciales en pares
+# clave-valor. Los Pods pueden consumir ConfigMaps como variables de entorno,
+# argumentos de línea de comandos o archivos de configuración en volúmenes.
+# ============================================================================
+
+# Versión de la API
+apiVersion: v1
+
+# Tipo de recurso
+kind: ConfigMap
+
+# ============================================================================
+# METADATA: Información de identificación del ConfigMap
+# ============================================================================
+metadata:
+  # Nombre único del ConfigMap
+  name: mi-aplicacion-config
+  
+  # Namespace
+  namespace: default
+  
+  # Labels para organizar y seleccionar
+  labels:
+    app: mi-aplicacion
+    environment: production
+    tier: backend
+    config-type: application
+  
+  # Annotations
+  annotations:
+    description: "Configuración de la aplicación principal"
+    contact: "devops@empresa.com"
+    last-updated: "2025-10-27"
+    version: "1.0"
+
+# ============================================================================
+# DATA: Datos de configuración (pares clave-valor como strings)
+# ============================================================================
+data:
+  # ========================================================================
+  # VARIABLES SIMPLES
+  # ========================================================================
+  # Variables de configuración básicas
+  APP_NAME: "Mi Aplicación"
+  APP_VERSION: "1.0.0"
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "info"
+  DEBUG_MODE: "false"
+  
+  # Configuración de base de datos
+  DATABASE_HOST: "postgres-service.default.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "mydb"
+  DATABASE_MAX_CONNECTIONS: "100"
+  DATABASE_TIMEOUT: "30"
+  
+  # Configuración de cache
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  CACHE_TTL: "3600"
+  
+  # URLs de servicios externos
+  API_BASE_URL: "https://api.example.com"
+  AUTH_SERVICE_URL: "https://auth.example.com"
+  STORAGE_SERVICE_URL: "https://storage.example.com"
+  
+  # Configuración de features
+  FEATURE_NEW_UI: "true"
+  FEATURE_ANALYTICS: "true"
+  FEATURE_BETA_ACCESS: "false"
+  
+  # Límites y timeouts
+  MAX_UPLOAD_SIZE: "10485760"  # 10MB en bytes
+  REQUEST_TIMEOUT: "30"
+  RATE_LIMIT: "1000"
+  
+  # ========================================================================
+  # ARCHIVOS DE CONFIGURACIÓN COMPLETOS
+  # ========================================================================
+  
+  # Archivo de configuración de aplicación (formato properties)
+  application.properties: |
+    # Application Configuration
+    app.name=Mi Aplicación
+    app.version=1.0.0
+    app.environment=production
+    
+    # Server Configuration
+    server.port=8080
+    server.host=0.0.0.0
+    server.shutdown.timeout=30s
+    
+    # Database Configuration
+    database.url=jdbc:postgresql://postgres-service:5432/mydb
+    database.pool.size=20
+    database.pool.max=50
+    database.connection.timeout=30000
+    
+    # Logging Configuration
+    logging.level.root=INFO
+    logging.level.com.myapp=DEBUG
+    logging.file.path=/var/log/app
+    logging.file.max-size=10MB
+    logging.file.max-history=30
+  
+  # Archivo de configuración YAML
+  application.yaml: |
+    application:
+      name: Mi Aplicación
+      version: 1.0.0
+      environment: production
+    
+    server:
+      port: 8080
+      host: 0.0.0.0
+      shutdown:
+        timeout: 30s
+      compression:
+        enabled: true
+        mime-types:
+          - text/html
+          - text/css
+          - application/json
+    
+    database:
+      host: postgres-service
+      port: 5432
+      name: mydb
+      pool:
+        min-size: 5
+        max-size: 20
+        idle-timeout: 600000
+      
+    cache:
+      type: redis
+      host: redis-service
+      port: 6379
+      ttl: 3600
+    
+    logging:
+      level:
+        root: INFO
+        com.myapp: DEBUG
+      pattern:
+        console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+        file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    
+    features:
+      new-ui: true
+      analytics: true
+      beta-access: false
+  
+  # Archivo de configuración JSON
+  config.json: |
+    {
+      "application": {
+        "name": "Mi Aplicación",
+        "version": "1.0.0",
+        "environment": "production"
+      },
+      "server": {
+        "port": 8080,
+        "host": "0.0.0.0",
+        "tls": {
+          "enabled": false,
+          "port": 8443
+        }
+      },
+      "database": {
+        "host": "postgres-service",
+        "port": 5432,
+        "name": "mydb",
+        "sslMode": "require"
+      },
+      "api": {
+        "timeout": 30,
+        "retries": 3,
+        "endpoints": {
+          "auth": "https://auth.example.com",
+          "storage": "https://storage.example.com"
+        }
+      },
+      "security": {
+        "cors": {
+          "enabled": true,
+          "allowedOrigins": ["https://example.com"],
+          "allowedMethods": ["GET", "POST", "PUT", "DELETE"],
+          "maxAge": 3600
+        },
+        "rateLimit": {
+          "enabled": true,
+          "requestsPerMinute": 100
+        }
+      }
+    }
+  
+  # Archivo de configuración TOML
+  config.toml: |
+    [application]
+    name = "Mi Aplicación"
+    version = "1.0.0"
+    environment = "production"
+    
+    [server]
+    port = 8080
+    host = "0.0.0.0"
+    
+    [database]
+    host = "postgres-service"
+    port = 5432
+    name = "mydb"
+    max_connections = 100
+    
+    [cache]
+    type = "redis"
+    host = "redis-service"
+    port = 6379
+    ttl = 3600
+  
+  # Configuración de Nginx
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+        
+        access_log /var/log/nginx/access.log main;
+        
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types text/plain text/css text/xml text/javascript
+                   application/json application/javascript application/xml+rss;
+        
+        upstream backend {
+            server backend-service:8080;
+            keepalive 32;
+        }
+        
+        server {
+            listen 80;
+            server_name _;
+            
+            location / {
+                proxy_pass http://backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+        }
+    }
+  
+  # Script de inicio
+  startup.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "=========================================="
+    echo "Iniciando aplicación..."
+    echo "Ambiente: $ENVIRONMENT"
+    echo "Versión: $APP_VERSION"
+    echo "=========================================="
+    
+    # Verificar variables requeridas
+    if [ -z "$DATABASE_HOST" ]; then
+        echo "ERROR: DATABASE_HOST no está definido"
+        exit 1
+    fi
+    
+    # Esperar a que la base de datos esté disponible
+    echo "Esperando base de datos..."
+    until nc -z $DATABASE_HOST $DATABASE_PORT; do
+        echo "Base de datos no disponible, reintentando..."
+        sleep 2
+    done
+    echo "Base de datos disponible"
+    
+    # Ejecutar migraciones
+    echo "Ejecutando migraciones..."
+    python manage.py migrate
+    
+    # Iniciar aplicación
+    echo "Iniciando servidor..."
+    exec python manage.py runserver 0.0.0.0:8080
+  
+  # Configuración de logging
+  logback.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <configuration>
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+        
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>/var/log/app/application.log</file>
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>/var/log/app/application.%d{yyyy-MM-dd}.log</fileNamePattern>
+                <maxHistory>30</maxHistory>
+            </rollingPolicy>
+        </appender>
+        
+        <logger name="com.myapp" level="DEBUG"/>
+        <logger name="org.springframework" level="INFO"/>
+        <logger name="org.hibernate" level="WARN"/>
+        
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+        </root>
+    </configuration>
+  
+  # Configuración de Prometheus
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    
+    scrape_configs:
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+
+# ============================================================================
+# BINARY DATA: Datos binarios (codificados en base64)
+# ============================================================================
+binaryData:
+  # Archivo binario de ejemplo (debe estar en base64)
+  # logo.png: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==
+
+# ============================================================================
+# IMMUTABLE: Hace que el ConfigMap sea inmutable
+# ============================================================================
+# Cuando es true, el ConfigMap no puede ser modificado después de su creación
+# Ventajas: mejor rendimiento, previene cambios accidentales
+# Desventajas: requiere crear un nuevo ConfigMap para cualquier cambio
+immutable: false
+
+---
+# ============================================================================
+# EJEMPLO 2: CONFIGMAP SIMPLE CON VARIABLES DE ENTORNO
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-env-config
+  namespace: default
+data:
+  DATABASE_HOST: "postgres.default.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  REDIS_HOST: "redis.default.svc.cluster.local"
+  REDIS_PORT: "6379"
+  LOG_LEVEL: "info"
+  CACHE_ENABLED: "true"
+
+---
+# ============================================================================
+# EJEMPLO 3: CONFIGMAP PARA NGINX
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: default
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    http {
+        server {
+            listen 80;
+            location / {
+                proxy_pass http://backend:8080;
+            }
+        }
+    }
+
+---
+# ============================================================================
+# EJEMPLO 4: CONFIGMAP CON SCRIPTS
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: init-scripts
+  namespace: default
+data:
+  init-db.sh: |
+    #!/bin/bash
+    psql -U postgres -d mydb -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(100));"
+  
+  backup.sh: |
+    #!/bin/bash
+    pg_dump -U postgres mydb > /backup/dump_$(date +%Y%m%d).sql
+
+---
+# ============================================================================
+# EJEMPLO 5: CONFIGMAP INMUTABLE
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: immutable-config
+  namespace: default
+data:
+  APP_VERSION: "1.0.0"
+  RELEASE_DATE: "2025-10-27"
+immutable: true
+
+---
+# ============================================================================
+# CÓMO USAR CONFIGMAPS EN PODS
+# ============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-usando-configmap
+spec:
+  containers:
+  - name: app
+    image: nginx:alpine
+    
+    # ========================================================================
+    # MÉTODO 1: Variables de entorno desde ConfigMap (individual)
+    # ========================================================================
+    env:
+    - name: DATABASE_HOST
+      valueFrom:
+        configMapKeyRef:
+          name: mi-aplicacion-config
+          key: DATABASE_HOST
+    - name: DATABASE_PORT
+      valueFrom:
+        configMapKeyRef:
+          name: mi-aplicacion-config
+          key: DATABASE_PORT
+    
+    # ========================================================================
+    # MÉTODO 2: Todas las variables desde ConfigMap
+    # ========================================================================
+    envFrom:
+    - configMapRef:
+        name: app-env-config
+    
+    # ========================================================================
+    # MÉTODO 3: Montar ConfigMap como volumen (archivos)
+    # ========================================================================
+    volumeMounts:
+    - name: config-volume
+      mountPath: /etc/config
+      readOnly: true
+    
+    # Montar archivo específico
+    - name: nginx-config-volume
+      mountPath: /etc/nginx/nginx.conf
+      subPath: nginx.conf
+      readOnly: true
+    
+    # Montar script
+    - name: scripts-volume
+      mountPath: /scripts
+      readOnly: true
+  
+  volumes:
+  # Volumen con todo el ConfigMap
+  - name: config-volume
+    configMap:
+      name: mi-aplicacion-config
+      defaultMode: 0644
+  
+  # Volumen con archivo específico
+  - name: nginx-config-volume
+    configMap:
+      name: nginx-config
+      items:
+      - key: nginx.conf
+        path: nginx.conf
+      defaultMode: 0644
+  
+  # Volumen con scripts ejecutables
+  - name: scripts-volume
+    configMap:
+      name: init-scripts
+      defaultMode: 0755  # Permisos de ejecución
+
+# ============================================================================
+# COMANDOS ÚTILES PARA CONFIGMAPS
+# ============================================================================
+# Crear ConfigMap desde literal:
+# kubectl create configmap my-config --from-literal=key1=value1 --from-literal=key2=value2
+
+# Crear ConfigMap desde archivo:
+# kubectl create configmap my-config --from-file=application.properties
+
+# Crear ConfigMap desde directorio:
+# kubectl create configmap my-config --from-file=config-dir/
+
+# Crear ConfigMap desde archivo con clave personalizada:
+# kubectl create configmap my-config --from-file=custom-key=application.properties
+
+# Ver ConfigMap:
+# kubectl get configmap my-config -o yaml
+
+# Editar ConfigMap:
+# kubectl edit configmap my-config
+
+# Eliminar ConfigMap:
+# kubectl delete configmap my-config
+
+# Describir ConfigMap:
+# kubectl describe configmap my-config
+
+# ============================================================================
+# NOTAS IMPORTANTES SOBRE CONFIGMAPS
+# ============================================================================
+# 1. LÍMITES:
+#    - Tamaño máximo: 1MB
+#    - Para datos más grandes, usar volúmenes persistentes
+#
+# 2. ACTUALIZACIÓN:
+#    - Cambios en ConfigMap se propagan a volúmenes (puede tardar minutos)
+#    - Variables de entorno NO se actualizan automáticamente (requiere recrear Pod)
+#
+# 3. SEGURIDAD:
+#    - ConfigMaps NO son encriptados
+#    - NO almacenar datos sensibles (usar Secrets)
+#    - Usar RBAC para controlar acceso
+#
+# 4. INMUTABILIDAD:
+#    - ConfigMaps inmutables mejoran rendimiento
+#    - Previenen cambios accidentales en producción
+#    - Útil para configuración de release
+#
+# 5. VERSIONADO:
+#    - Incluir versión en el nombre (app-config-v1, app-config-v2)
+#    - Facilita rollback y blue-green deployments
+#
+# 6. NAMESPACES:
+#    - ConfigMaps son por namespace
+#    - No se pueden compartir entre namespaces
+#
+# 7. MEJORES PRÁCTICAS:
+#    - Un ConfigMap por aplicación/componente
+#    - Separar configuración por ambiente (dev, staging, prod)
+#    - Documentar cada clave en annotations
+#    - Usar labels para organizar
+#    - Validar configuración antes de aplicar
+#
+# 8. PROPAGACIÓN DE CAMBIOS:
+#    - Volúmenes: automático (kubelet sync, puede tardar)
+#    - Variables de entorno: requiere restart del Pod
+#    - Usar liveness/readiness probes para detectar config inválida
+
+# ============================================================================
+# FIN DEL CONFIGMAP
+# ============================================================================

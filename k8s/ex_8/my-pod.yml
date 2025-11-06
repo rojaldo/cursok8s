@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-init-script
+spec:
+  containers:
+  - name: custom-script-container
+    image: busybox
+    command: ["/bin/sh", "-c"]
+    args:
+      - /bin/sh -c "echo 'Ejecutando script de inicialización'; sleep 2; echo 'Script terminado'; sleep 3600"

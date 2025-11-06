@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-pod
+  labels:
+    app: configmap-demo
+spec:
+  containers:
+  - name: app
+    image: busybox:latest
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Configuration from ConfigMap ==="
+        echo "DATABASE_URL: $DATABASE_URL"
+        echo "API_KEY: $API_KEY"
+        echo "LOG_LEVEL: $LOG_LEVEL"
+        echo "MAX_CONNECTIONS: $MAX_CONNECTIONS"
+        echo "==================================="
+        sleep 3600
+    envFrom:
+    - configMapRef:
+        name: app-config

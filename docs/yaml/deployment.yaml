@@ -1,0 +1,706 @@
+# ============================================================================
+# DEPLOYMENT DE KUBERNETES - EJEMPLO COMPLETO CON TODOS LOS APARTADOS
+# ============================================================================
+
+# La versión de la API que define el formato de este objeto
+# Para Deployments, usamos apps/v1
+apiVersion: apps/v1
+
+# El tipo de objeto de Kubernetes que estamos creando
+# Deployment gestiona la creación y actualización de Pods
+kind: Deployment
+
+# ============================================================================
+# METADATA: Información que identifica de forma única al Deployment
+# ============================================================================
+metadata:
+  # Nombre único del Deployment dentro del namespace
+  name: mi-aplicacion-deployment
+  
+  # Namespace donde se creará el Deployment (opcional, default es 'default')
+  namespace: produccion
+  
+  # Labels: pares clave-valor para organizar y seleccionar recursos
+  # Se usan para filtrado, agrupación y selección de objetos
+  labels:
+    app: mi-aplicacion
+    version: v1.0.0
+    environment: production
+    team: backend
+    tier: frontend
+  
+  # Annotations: metadata no identificativa para almacenar información adicional
+  # Usada por herramientas, bibliotecas o para documentación
+  annotations:
+    description: "Deployment principal de la aplicación web"
+    contact: "equipo-devops@empresa.com"
+    documentation: "https://docs.empresa.com/mi-aplicacion"
+    kubernetes.io/change-cause: "Actualización a la versión 1.0.0"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+
+# ============================================================================
+# SPEC: Especificación deseada del Deployment
+# ============================================================================
+spec:
+  # Número de réplicas (Pods) que deben estar ejecutándose
+  replicas: 3
+  
+  # ============================================================================
+  # SELECTOR: Define cómo el Deployment encuentra los Pods que debe gestionar
+  # ============================================================================
+  selector:
+    # Debe coincidir con las labels del template de Pods
+    matchLabels:
+      app: mi-aplicacion
+      version: v1.0.0
+    
+    # Expresiones de selección más complejas (opcional)
+    matchExpressions:
+      - key: environment
+        operator: In
+        values:
+          - production
+          - staging
+  
+  # ============================================================================
+  # ESTRATEGIA DE ACTUALIZACIÓN: Cómo se realizan los rollouts
+  # ============================================================================
+  strategy:
+    # Tipo de estrategia: RollingUpdate (por defecto) o Recreate
+    type: RollingUpdate
+    
+    rollingUpdate:
+      # Número máximo de Pods que pueden estar no disponibles durante la actualización
+      # Puede ser un número absoluto (ej: 1) o porcentaje (ej: 25%)
+      maxUnavailable: 1
+      
+      # Número máximo de Pods adicionales que se pueden crear durante la actualización
+      # Puede ser un número absoluto (ej: 2) o porcentaje (ej: 25%)
+      maxSurge: 1
+  
+  # Número mínimo de segundos que un Pod debe estar listo sin fallos
+  # antes de considerarse disponible
+  minReadySeconds: 10
+  
+  # Número de revisiones antiguas de ReplicaSets que se mantienen para rollback
+  revisionHistoryLimit: 10
+  
+  # Indica si la ejecución del Deployment debe pausarse
+  paused: false
+  
+  # Deadline en segundos para que el Deployment progrese antes de reportarse como fallido
+  progressDeadlineSeconds: 600
+  
+  # ============================================================================
+  # TEMPLATE: Plantilla para crear los Pods
+  # ============================================================================
+  template:
+    # Metadata para los Pods que se crearán
+    metadata:
+      # Labels de los Pods (DEBEN coincidir con el selector)
+      labels:
+        app: mi-aplicacion
+        version: v1.0.0
+        environment: production
+        team: backend
+      
+      # Annotations específicas de los Pods
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    
+    # ============================================================================
+    # SPEC DEL POD: Especificación de los contenedores y configuración del Pod
+    # ============================================================================
+    spec:
+      # ========================================================================
+      # CONTENEDORES: Lista de contenedores que correrán en el Pod
+      # ========================================================================
+      containers:
+      # Contenedor principal de la aplicación
+      - name: mi-aplicacion
+        
+        # Imagen del contenedor con tag específico (evitar 'latest' en producción)
+        image: miregistro.com/mi-aplicacion:1.0.0
+        
+        # Política de descarga de imagen:
+        # - Always: siempre descarga la imagen
+        # - IfNotPresent: solo si no existe localmente
+        # - Never: nunca descarga, debe existir localmente
+        imagePullPolicy: IfNotPresent
+        
+        # Comando que ejecuta el contenedor (sobrescribe ENTRYPOINT del Dockerfile)
+        command:
+          - "/bin/sh"
+          - "-c"
+        
+        # Argumentos del comando (sobrescribe CMD del Dockerfile)
+        args:
+          - "npm start"
+        
+        # Directorio de trabajo dentro del contenedor
+        workingDir: /app
+        
+        # ====================================================================
+        # PUERTOS: Puertos que expone el contenedor
+        # ====================================================================
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        # ====================================================================
+        # VARIABLES DE ENTORNO: Configuración mediante variables
+        # ====================================================================
+        env:
+        # Variable simple con valor directo
+        - name: ENVIRONMENT
+          value: "production"
+        
+        - name: LOG_LEVEL
+          value: "info"
+        
+        # Variable desde un ConfigMap
+        - name: APP_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              name: mi-aplicacion-config
+              key: app.config
+        
+        # Variable desde un Secret
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mi-aplicacion-secrets
+              key: db-password
+        
+        # Variable con metadatos del Pod
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        
+        # Variable desde recursos del contenedor
+        - name: MEMORY_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: mi-aplicacion
+              resource: limits.memory
+        
+        # Cargar todas las variables de un ConfigMap
+        envFrom:
+        - configMapRef:
+            name: mi-aplicacion-env
+        # Cargar todas las variables de un Secret
+        - secretRef:
+            name: mi-aplicacion-secrets-env
+        
+        # ====================================================================
+        # RECURSOS: Límites y solicitudes de CPU y memoria
+        # ====================================================================
+        resources:
+          # Requests: recursos garantizados que el contenedor necesita
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+            ephemeral-storage: "1Gi"
+          
+          # Limits: recursos máximos que el contenedor puede usar
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+            ephemeral-storage: "2Gi"
+        
+        # ====================================================================
+        # PROBES: Verificaciones de salud del contenedor
+        # ====================================================================
+        
+        # Liveness Probe: verifica si el contenedor está vivo
+        # Si falla, Kubernetes reinicia el contenedor
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+            httpHeaders:
+            - name: Custom-Header
+              value: HealthCheck
+          initialDelaySeconds: 30  # Espera antes de la primera verificación
+          periodSeconds: 10         # Frecuencia de verificación
+          timeoutSeconds: 5         # Timeout de cada verificación
+          successThreshold: 1       # Éxitos consecutivos para considerar saludable
+          failureThreshold: 3       # Fallos consecutivos para reiniciar
+        
+        # Readiness Probe: verifica si el contenedor está listo para recibir tráfico
+        # Si falla, se elimina del Service
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Startup Probe: verifica si la aplicación ha iniciado
+        # Útil para aplicaciones con inicio lento
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30  # 30 fallos * 10 segundos = 5 minutos máximo de inicio
+        
+        # ====================================================================
+        # LIFECYCLE: Hooks del ciclo de vida del contenedor
+        # ====================================================================
+        lifecycle:
+          # PostStart: se ejecuta inmediatamente después de crear el contenedor
+          postStart:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "echo 'Contenedor iniciado' > /tmp/startup.log"
+          
+          # PreStop: se ejecuta antes de terminar el contenedor
+          # Útil para shutdown graceful
+          preStop:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "sleep 15 && kill -SIGTERM 1"
+        
+        # ====================================================================
+        # VOLÚMENES: Montajes de volúmenes en el contenedor
+        # ====================================================================
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+          readOnly: true
+        
+        - name: secret-volume
+          mountPath: /etc/secrets
+          readOnly: true
+        
+        - name: data-volume
+          mountPath: /data
+        
+        - name: logs-volume
+          mountPath: /var/log/app
+        
+        - name: tmp-volume
+          mountPath: /tmp
+        
+        - name: cache-volume
+          mountPath: /app/cache
+        
+        # ====================================================================
+        # SEGURIDAD: Contexto de seguridad del contenedor
+        # ====================================================================
+        securityContext:
+          # Ejecutar como usuario no root
+          runAsUser: 1000
+          runAsGroup: 3000
+          runAsNonRoot: true
+          
+          # No permite escalada de privilegios
+          allowPrivilegeEscalation: false
+          
+          # Capacidades de Linux
+          capabilities:
+            drop:
+              - ALL
+            add:
+              - NET_BIND_SERVICE
+          
+          # Sistema de archivos de solo lectura
+          readOnlyRootFilesystem: true
+          
+          # SELinux options
+          seLinuxOptions:
+            level: "s0:c123,c456"
+          
+          # Seccomp profile
+          seccompProfile:
+            type: RuntimeDefault
+        
+        # Terminal TTY
+        tty: false
+        stdin: false
+        stdinOnce: false
+      
+      # ========================================================================
+      # CONTENEDOR SIDECAR: Ejemplo de contenedor adicional (logging agent)
+      # ========================================================================
+      - name: log-agent
+        image: fluent/fluent-bit:2.0
+        imagePullPolicy: IfNotPresent
+        
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        
+        volumeMounts:
+        - name: logs-volume
+          mountPath: /var/log/app
+          readOnly: true
+        - name: fluent-bit-config
+          mountPath: /fluent-bit/etc
+      
+      # ========================================================================
+      # INIT CONTAINERS: Contenedores que se ejecutan antes del contenedor principal
+      # ========================================================================
+      initContainers:
+      # Init container para verificar dependencias
+      - name: init-database
+        image: busybox:1.35
+        command:
+          - 'sh'
+          - '-c'
+          - 'until nc -z database-service 5432; do echo waiting for database; sleep 2; done'
+        
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "50m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+      
+      # Init container para preparar datos
+      - name: init-data
+        image: busybox:1.35
+        command:
+          - 'sh'
+          - '-c'
+          - 'cp /config-source/* /config-dest/ && chmod 644 /config-dest/*'
+        
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config-source
+        - name: data-volume
+          mountPath: /config-dest
+      
+      # ========================================================================
+      # VOLÚMENES: Definición de volúmenes disponibles para los contenedores
+      # ========================================================================
+      volumes:
+      # Volumen desde ConfigMap
+      - name: config-volume
+        configMap:
+          name: mi-aplicacion-config
+          defaultMode: 0644
+          items:
+          - key: app.properties
+            path: application.properties
+      
+      # Volumen desde Secret
+      - name: secret-volume
+        secret:
+          secretName: mi-aplicacion-secrets
+          defaultMode: 0400
+          items:
+          - key: tls.crt
+            path: tls/cert.pem
+          - key: tls.key
+            path: tls/key.pem
+      
+      # Volumen vacío (temporal)
+      - name: tmp-volume
+        emptyDir: {}
+      
+      # Volumen vacío en memoria
+      - name: cache-volume
+        emptyDir:
+          medium: Memory
+          sizeLimit: "128Mi"
+      
+      # Volumen desde PersistentVolumeClaim
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: mi-aplicacion-pvc
+      
+      # Volumen compartido para logs
+      - name: logs-volume
+        emptyDir: {}
+      
+      # Volumen con configuración de Fluent Bit
+      - name: fluent-bit-config
+        configMap:
+          name: fluent-bit-config
+      
+      # Volumen desde hostPath (usar con precaución)
+      - name: host-volume
+        hostPath:
+          path: /var/data
+          type: DirectoryOrCreate
+      
+      # Volumen proyectado (combina múltiples fuentes)
+      - name: projected-volume
+        projected:
+          defaultMode: 0644
+          sources:
+          - configMap:
+              name: config1
+          - secret:
+              name: secret1
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 3600
+      
+      # ========================================================================
+      # CONFIGURACIÓN DE RED Y DNS
+      # ========================================================================
+      
+      # Política de DNS del Pod
+      # - ClusterFirst: usa DNS del cluster
+      # - Default: hereda DNS del nodo
+      # - ClusterFirstWithHostNet: para Pods con hostNetwork
+      # - None: permite configuración personalizada
+      dnsPolicy: ClusterFirst
+      
+      # Configuración DNS personalizada
+      dnsConfig:
+        nameservers:
+          - 8.8.8.8
+        searches:
+          - mi-namespace.svc.cluster.local
+          - svc.cluster.local
+        options:
+          - name: ndots
+            value: "2"
+      
+      # Nombre de host del Pod
+      hostname: mi-aplicacion-pod
+      
+      # Subdominio para el Pod
+      subdomain: mi-aplicacion
+      
+      # Usar la red del host
+      hostNetwork: false
+      
+      # Usar el PID namespace del host
+      hostPID: false
+      
+      # Usar el IPC namespace del host
+      hostIPC: false
+      
+      # ========================================================================
+      # SERVICE ACCOUNT Y SEGURIDAD
+      # ========================================================================
+      
+      # Service Account para el Pod
+      serviceAccountName: mi-aplicacion-sa
+      
+      # Montar automáticamente el token del Service Account
+      automountServiceAccountToken: true
+      
+      # Contexto de seguridad a nivel de Pod
+      securityContext:
+        # FS Group para volúmenes
+        fsGroup: 2000
+        fsGroupChangePolicy: "OnRootMismatch"
+        
+        # Supplemental groups
+        supplementalGroups:
+          - 3000
+        
+        # SELinux options a nivel de Pod
+        seLinuxOptions:
+          level: "s0:c123,c456"
+        
+        # Seccomp profile a nivel de Pod
+        seccompProfile:
+          type: RuntimeDefault
+        
+        # Sysctls seguros
+        sysctls:
+        - name: net.ipv4.ip_local_port_range
+          value: "1024 65535"
+      
+      # ========================================================================
+      # SCHEDULING: Configuración de asignación de Pods a nodos
+      # ========================================================================
+      
+      # Selector de nodos por labels
+      nodeSelector:
+        disktype: ssd
+        environment: production
+      
+      # Nombre del nodo específico (raramente usado)
+      # nodeName: node-01
+      
+      # Afinidad y anti-afinidad
+      affinity:
+        # Afinidad de nodo: preferencias de en qué nodos ejecutar
+        nodeAffinity:
+          # Reglas requeridas (hard)
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/zone
+                operator: In
+                values:
+                - us-east-1a
+                - us-east-1b
+          
+          # Reglas preferidas (soft)
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - high-performance
+        
+        # Afinidad de Pod: preferir ejecutar cerca de otros Pods
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - cache
+            topologyKey: kubernetes.io/hostname
+        
+        # Anti-afinidad de Pod: evitar ejecutar cerca de otros Pods
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - mi-aplicacion
+              topologyKey: kubernetes.io/hostname
+      
+      # Tolerations: permite que el Pod se ejecute en nodos con taints
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "dedicated"
+        operator: "Equal"
+        value: "database"
+        effect: "NoSchedule"
+      - key: "high-load"
+        operator: "Equal"
+        value: "true"
+        effect: "PreferNoSchedule"
+        tolerationSeconds: 3600
+      
+      # Nombre de la clase de prioridad
+      priorityClassName: high-priority
+      
+      # Valor de prioridad (solo si no se usa priorityClassName)
+      # priority: 1000
+      
+      # Topology Spread Constraints: distribuir Pods entre topologías
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: mi-aplicacion
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: mi-aplicacion
+      
+      # ========================================================================
+      # CONFIGURACIÓN DE RUNTIME
+      # ========================================================================
+      
+      # Clase de runtime (ej: gvisor, kata-containers)
+      runtimeClassName: kata
+      
+      # Overhead del Pod (recursos adicionales del runtime)
+      overhead:
+        memory: "20Mi"
+        cpu: "10m"
+      
+      # ========================================================================
+      # POLÍTICAS Y COMPORTAMIENTO
+      # ========================================================================
+      
+      # Política de reinicio:
+      # - Always: siempre reinicia (default para Deployments)
+      # - OnFailure: solo reinicia si falla
+      # - Never: nunca reinicia
+      restartPolicy: Always
+      
+      # Segundos antes de terminar gracefully el Pod
+      terminationGracePeriodSeconds: 30
+      
+      # Segundos de timeout para activar el terminationGracePeriodSeconds
+      activeDeadlineSeconds: 3600
+      
+      # Política de preempción
+      # - PreemptLowerPriority: puede desalojar Pods de menor prioridad
+      # - Never: nunca desaloja otros Pods
+      preemptionPolicy: PreemptLowerPriority
+      
+      # ========================================================================
+      # OTRAS CONFIGURACIONES
+      # ========================================================================
+      
+      # Secretos para pull de imágenes privadas
+      imagePullSecrets:
+      - name: regcred
+      - name: docker-registry-secret
+      
+      # Habilitar Service Links como variables de entorno
+      enableServiceLinks: true
+      
+      # Compartir un único proceso namespace entre contenedores
+      shareProcessNamespace: false
+      
+      # Setear hostname como FQDN
+      setHostnameAsFQDN: false
+      
+      # Configuración de sistema operativo
+      os:
+        name: linux
+      
+      # Configuración de recursos efímeros (opcional)
+      ephemeralContainers: []
+      
+      # ReadinessGates: condiciones adicionales para considerar el Pod ready
+      readinessGates:
+      - conditionType: "example.com/feature-ready"
+
+# ============================================================================
+# FIN DEL DEPLOYMENT
+# ============================================================================

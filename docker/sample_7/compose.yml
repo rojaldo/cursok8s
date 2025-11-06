@@ -1,0 +1,19 @@
+services:
+ web:
+   image: nginx:latest
+   ports:
+     - "8081:80"
+   deploy:
+     replicas: 5
+     restart_policy:
+       condition: on-failure
+ db:
+   image: postgres:16.9-bullseye
+   environment:
+     POSTGRES_USER: user
+     POSTGRES_PASSWORD: password
+     POSTGRES_DB: mydb
+   volumes:
+     - db-data:/var/lib/postgresql/data
+volumes:
+   db-data:

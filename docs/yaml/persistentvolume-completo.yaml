@@ -1,0 +1,743 @@
+# ============================================================================
+# PERSISTENTVOLUME (PV) DE KUBERNETES - EJEMPLO COMPLETO
+# ============================================================================
+# Un PersistentVolume es un recurso de almacenamiento en el cluster.
+# Es un volumen que existe independiente del ciclo de vida de los Pods.
+# Los PVs son provisionados por administradores o dinámicamente con Storage Classes.
+# ============================================================================
+
+# Versión de la API
+apiVersion: v1
+
+# Tipo de recurso
+kind: PersistentVolume
+
+# ============================================================================
+# METADATA: Información de identificación del PV
+# ============================================================================
+metadata:
+  # Nombre único del PersistentVolume
+  name: mi-pv
+  
+  # NOTA: PVs son recursos a nivel de cluster (no tienen namespace)
+  
+  # Labels
+  labels:
+    type: local
+    environment: production
+    storage-tier: ssd
+  
+  # Annotations
+  annotations:
+    description: "Volumen persistente para base de datos"
+    provisioner: "manual"
+    volume-type: "nfs"
+
+# ============================================================================
+# SPEC: Especificación del PersistentVolume
+# ============================================================================
+spec:
+  # ========================================================================
+  # CAPACITY: Capacidad de almacenamiento
+  # ========================================================================
+  capacity:
+    storage: 10Gi
+  
+  # ========================================================================
+  # VOLUME MODE: Modo del volumen
+  # ========================================================================
+  # - Filesystem (default): montado como sistema de archivos
+  # - Block: montado como dispositivo de bloque raw
+  volumeMode: Filesystem
+  
+  # ========================================================================
+  # ACCESS MODES: Modos de acceso
+  # ========================================================================
+  # - ReadWriteOnce (RWO): lectura/escritura por un solo nodo
+  # - ReadOnlyMany (ROX): solo lectura por múltiples nodos
+  # - ReadWriteMany (RWX): lectura/escritura por múltiples nodos
+  # - ReadWriteOncePod (RWOP): lectura/escritura por un solo Pod (K8s 1.22+)
+  accessModes:
+    - ReadWriteOnce
+  
+  # ========================================================================
+  # PERSISTENT VOLUME RECLAIM POLICY: Política de reclamación
+  # ========================================================================
+  # Qué hacer con el PV cuando se elimina el PVC
+  # - Retain: mantener el volumen y los datos (requiere limpieza manual)
+  # - Delete: eliminar el volumen y los datos automáticamente
+  # - Recycle (deprecated): limpiar datos y reutilizar el volumen
+  persistentVolumeReclaimPolicy: Retain
+  
+  # ========================================================================
+  # STORAGE CLASS NAME: Clase de almacenamiento
+  # ========================================================================
+  # Nombre de la StorageClass asociada
+  # PVCs pueden filtrar PVs por StorageClass
+  storageClassName: fast-ssd
+  
+  # ========================================================================
+  # MOUNT OPTIONS: Opciones de montaje
+  # ========================================================================
+  # Opciones específicas del tipo de volumen
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+    - noatime
+    - nodiratime
+  
+  # ========================================================================
+  # NODE AFFINITY: Afinidad de nodo
+  # ========================================================================
+  # Restringe en qué nodos puede montarse el PV
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - node-1
+          - node-2
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - us-east-1a
+  
+  # ========================================================================
+  # VOLUME SOURCE: Fuente del volumen (elegir UNO)
+  # ========================================================================
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 1: NFS (Network File System)
+  # --------------------------------------------------------------------
+  nfs:
+    server: nfs-server.example.com
+    path: "/exports/data"
+    readOnly: false
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 2: HostPath (solo para desarrollo/testing)
+  # --------------------------------------------------------------------
+  # hostPath:
+  #   path: /mnt/data
+  #   type: DirectoryOrCreate  # Directory, DirectoryOrCreate, File, FileOrCreate
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 3: Local (almacenamiento local del nodo)
+  # --------------------------------------------------------------------
+  # local:
+  #   path: /mnt/disks/ssd1
+  #   fsType: ext4
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 4: iSCSI
+  # --------------------------------------------------------------------
+  # iscsi:
+  #   targetPortal: 10.0.2.15:3260
+  #   iqn: iqn.2001-04.com.example:storage.kube.sys1.xyz
+  #   lun: 0
+  #   fsType: ext4
+  #   readOnly: false
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 5: AWS EBS
+  # --------------------------------------------------------------------
+  # awsElasticBlockStore:
+  #   volumeID: vol-12345678
+  #   fsType: ext4
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 6: GCE Persistent Disk
+  # --------------------------------------------------------------------
+  # gcePersistentDisk:
+  #   pdName: my-data-disk
+  #   fsType: ext4
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 7: Azure Disk
+  # --------------------------------------------------------------------
+  # azureDisk:
+  #   diskName: myAzureDisk
+  #   diskURI: /subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.Compute/disks/myAzureDisk
+  #   kind: Managed
+  #   fsType: ext4
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 8: CephFS
+  # --------------------------------------------------------------------
+  # cephfs:
+  #   monitors:
+  #     - 10.16.154.78:6789
+  #     - 10.16.154.79:6789
+  #     - 10.16.154.80:6789
+  #   path: /kubernetes/volumes
+  #   user: admin
+  #   secretRef:
+  #     name: ceph-secret
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 9: Cinder (OpenStack)
+  # --------------------------------------------------------------------
+  # cinder:
+  #   volumeID: bd82f7e2-wece-4c01-a505-4acf60b07f4a
+  #   fsType: ext4
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 10: FC (Fibre Channel)
+  # --------------------------------------------------------------------
+  # fc:
+  #   targetWWNs: ['500a0982991b8dc5', '500a0982991b8dc6']
+  #   lun: 2
+  #   fsType: ext4
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 11: Flocker
+  # --------------------------------------------------------------------
+  # flocker:
+  #   datasetName: my-flocker-vol
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 12: Glusterfs
+  # --------------------------------------------------------------------
+  # glusterfs:
+  #   endpoints: glusterfs-cluster
+  #   path: kube_vol
+  #   readOnly: false
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 13: RBD (RADOS Block Device)
+  # --------------------------------------------------------------------
+  # rbd:
+  #   monitors:
+  #     - 10.16.154.78:6789
+  #     - 10.16.154.79:6789
+  #   image: foo
+  #   fsType: ext4
+  #   pool: kube
+  #   user: admin
+  #   secretRef:
+  #     name: ceph-secret
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 14: VsphereVolume
+  # --------------------------------------------------------------------
+  # vsphereVolume:
+  #   volumePath: "[datastore1] volumes/myVolume"
+  #   fsType: ext4
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 15: Portworx Volume
+  # --------------------------------------------------------------------
+  # portworxVolume:
+  #   volumeID: pxvol
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 16: ScaleIO
+  # --------------------------------------------------------------------
+  # scaleIO:
+  #   gateway: https://localhost:443/api
+  #   system: scaleio
+  #   protectionDomain: default
+  #   storagePool: default
+  #   volumeName: vol-0
+  #   secretRef:
+  #     name: sio-secret
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 17: Quobyte
+  # --------------------------------------------------------------------
+  # quobyte:
+  #   registry: registry.example.com:7861
+  #   volume: testvolume
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 18: StorageOS
+  # --------------------------------------------------------------------
+  # storageos:
+  #   volumeName: pvc-abc123
+  #   volumeNamespace: default
+  #   fsType: ext4
+  
+  # --------------------------------------------------------------------
+  # OPCIÓN 19: CSI (Container Storage Interface)
+  # --------------------------------------------------------------------
+  # csi:
+  #   driver: csi.example.com
+  #   volumeHandle: unique-volume-id
+  #   readOnly: false
+  #   fsType: ext4
+  #   volumeAttributes:
+  #     key1: value1
+  #     key2: value2
+
+---
+# ============================================================================
+# PERSISTENTVOLUMECLAIM (PVC) DE KUBERNETES - EJEMPLO COMPLETO
+# ============================================================================
+# Un PersistentVolumeClaim es una solicitud de almacenamiento por un usuario.
+# Los Pods usan PVCs para solicitar almacenamiento físico.
+# Kubernetes vincula PVCs con PVs disponibles que cumplan los requisitos.
+# ============================================================================
+
+# Versión de la API
+apiVersion: v1
+
+# Tipo de recurso
+kind: PersistentVolumeClaim
+
+# ============================================================================
+# METADATA: Información de identificación del PVC
+# ============================================================================
+metadata:
+  # Nombre único del PersistentVolumeClaim
+  name: mi-pvc
+  
+  # Namespace
+  namespace: default
+  
+  # Labels
+  labels:
+    app: mi-aplicacion
+    environment: production
+  
+  # Annotations
+  annotations:
+    description: "Solicitud de volumen para base de datos"
+    volume.beta.kubernetes.io/storage-provisioner: "kubernetes.io/aws-ebs"
+
+# ============================================================================
+# SPEC: Especificación del PersistentVolumeClaim
+# ============================================================================
+spec:
+  # ========================================================================
+  # ACCESS MODES: Modos de acceso solicitados
+  # ========================================================================
+  # Debe coincidir con el PV para que se vincule
+  accessModes:
+    - ReadWriteOnce
+  
+  # ========================================================================
+  # VOLUME MODE: Modo del volumen
+  # ========================================================================
+  volumeMode: Filesystem
+  
+  # ========================================================================
+  # RESOURCES: Recursos de almacenamiento solicitados
+  # ========================================================================
+  resources:
+    requests:
+      storage: 5Gi
+    # Opcionalmente, límites (no comúnmente usado)
+    # limits:
+    #   storage: 10Gi
+  
+  # ========================================================================
+  # STORAGE CLASS NAME: Clase de almacenamiento
+  # ========================================================================
+  # Especifica qué StorageClass usar
+  # Si no se especifica, usa la StorageClass por defecto
+  storageClassName: fast-ssd
+  
+  # ========================================================================
+  # SELECTOR: Selector para filtrar PVs
+  # ========================================================================
+  # Permite vincular a PVs específicos por labels
+  selector:
+    matchLabels:
+      environment: production
+      storage-tier: ssd
+    matchExpressions:
+    - key: type
+      operator: In
+      values:
+      - local
+      - nfs
+  
+  # ========================================================================
+  # VOLUME NAME: Nombre específico del PV
+  # ========================================================================
+  # Vincula a un PV específico por nombre (pre-binding)
+  # volumeName: mi-pv
+  
+  # ========================================================================
+  # DATA SOURCE: Fuente de datos (clonar o restaurar)
+  # ========================================================================
+  # Clonar desde otro PVC
+  # dataSource:
+  #   name: source-pvc
+  #   kind: PersistentVolumeClaim
+  
+  # Restaurar desde snapshot
+  # dataSource:
+  #   name: snapshot-name
+  #   kind: VolumeSnapshot
+  #   apiGroup: snapshot.storage.k8s.io
+  
+  # ========================================================================
+  # DATA SOURCE REF: Referencia a fuente de datos
+  # ========================================================================
+  # Similar a dataSource pero con más flexibilidad (K8s 1.26+)
+  # dataSourceRef:
+  #   name: snapshot-name
+  #   kind: VolumeSnapshot
+  #   apiGroup: snapshot.storage.k8s.io
+
+---
+# ============================================================================
+# STORAGECLASS DE KUBERNETES - EJEMPLO COMPLETO
+# ============================================================================
+# Una StorageClass describe clases de almacenamiento disponibles.
+# Permite aprovisionamiento dinámico de PVs.
+# ============================================================================
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+  annotations:
+    description: "Almacenamiento SSD de alta velocidad"
+    storageclass.kubernetes.io/is-default-class: "false"
+
+# Provisioner: controlador que provisiona los volúmenes
+# Cada cloud provider tiene sus propios provisioners
+provisioner: kubernetes.io/aws-ebs
+
+# Parámetros específicos del provisioner
+parameters:
+  type: gp3
+  iopsPerGB: "10"
+  fsType: ext4
+  encrypted: "true"
+
+# Política de reclamación por defecto para PVs creados
+reclaimPolicy: Delete
+
+# Permite expandir volúmenes existentes
+allowVolumeExpansion: true
+
+# Modo de binding de volumen
+# - Immediate: vincula y provisiona inmediatamente
+# - WaitForFirstConsumer: espera a que se cree un Pod que use el PVC
+volumeBindingMode: WaitForFirstConsumer
+
+# Topología permitida
+allowedTopologies:
+- matchLabelExpressions:
+  - key: topology.kubernetes.io/zone
+    values:
+    - us-east-1a
+    - us-east-1b
+
+# Opciones de montaje
+mountOptions:
+  - debug
+  - noatime
+
+---
+# ============================================================================
+# EJEMPLOS DE DIFERENTES CONFIGURACIONES
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# EJEMPLO 1: PV SIMPLE CON HOSTPATH (SOLO DESARROLLO)
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hostpath-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /tmp/data
+    type: DirectoryOrCreate
+  storageClassName: manual
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hostpath-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: manual
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 2: PV CON NFS
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-pv
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: nfs-server.example.com
+    path: "/shared/data"
+  persistentVolumeReclaimPolicy: Retain
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 3: STORAGECLASS PARA AWS EBS
+# ----------------------------------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: aws-ebs-gp3
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  fsType: ext4
+  encrypted: "true"
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 4: STORAGECLASS PARA GCP PD
+# ----------------------------------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gcp-pd-ssd
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 5: STORAGECLASS PARA AZURE DISK
+# ----------------------------------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azure-disk-premium
+provisioner: kubernetes.io/azure-disk
+parameters:
+  storageaccounttype: Premium_LRS
+  kind: Managed
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 6: PVC CON APROVISIONAMIENTO DINÁMICO
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dynamic-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: fast-ssd
+  # No especificar volumeName - se crea automáticamente
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 7: USO DE PVC EN POD
+# ----------------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-con-pvc
+spec:
+  containers:
+  - name: app
+    image: nginx:alpine
+    volumeMounts:
+    - name: data
+      mountPath: /usr/share/nginx/html
+  
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: mi-pvc
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 8: USO DE PVC EN DEPLOYMENT
+# ----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-con-pvc
+spec:
+  replicas: 1  # Solo 1 réplica si es ReadWriteOnce
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: app
+        image: myapp:latest
+        volumeMounts:
+        - name: persistent-storage
+          mountPath: /data
+      
+      volumes:
+      - name: persistent-storage
+        persistentVolumeClaim:
+          claimName: mi-pvc
+
+---
+# ----------------------------------------------------------------------------
+# EJEMPLO 9: STATEFULSET CON VOLUMECLAIMTEMPLATES
+# ----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: statefulset-con-pvc
+spec:
+  serviceName: "myapp"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: app
+        image: myapp:latest
+        volumeMounts:
+        - name: data
+          mountPath: /data
+  
+  # Cada Pod obtiene su propio PVC
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "fast-ssd"
+      resources:
+        requests:
+          storage: 10Gi
+
+# ============================================================================
+# COMANDOS ÚTILES
+# ============================================================================
+# Ver PVs:
+# kubectl get pv
+
+# Ver PVCs:
+# kubectl get pvc
+
+# Ver StorageClasses:
+# kubectl get storageclass
+
+# Describir PV:
+# kubectl describe pv mi-pv
+
+# Describir PVC:
+# kubectl describe pvc mi-pvc
+
+# Ver PVC con PV vinculado:
+# kubectl get pvc -o wide
+
+# Ver uso de almacenamiento:
+# kubectl top pv
+
+# Expandir PVC (si allowVolumeExpansion: true):
+# kubectl patch pvc mi-pvc -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
+
+# Eliminar PVC:
+# kubectl delete pvc mi-pvc
+
+# Ver eventos relacionados con almacenamiento:
+# kubectl get events --field-selector involvedObject.kind=PersistentVolumeClaim
+
+# ============================================================================
+# NOTAS IMPORTANTES
+# ============================================================================
+# 1. CICLO DE VIDA:
+#    - PV: provisionado por admin o dinámicamente
+#    - PVC: creado por usuario, solicita almacenamiento
+#    - Binding: Kubernetes vincula PVC con PV compatible
+#    - Uso: Pod usa PVC
+#    - Reclamación: cuando se elimina PVC, se aplica reclaimPolicy
+#
+# 2. ACCESS MODES:
+#    - RWO (ReadWriteOnce): más común, un nodo a la vez
+#    - ROX (ReadOnlyMany): múltiples nodos, solo lectura
+#    - RWX (ReadWriteMany): múltiples nodos, lectura/escritura
+#    - RWOP (ReadWriteOncePod): un Pod, K8s 1.22+
+#
+# 3. RECLAIM POLICIES:
+#    - Retain: datos persisten, limpieza manual
+#    - Delete: elimina PV y datos (común en dinámico)
+#    - Recycle: deprecated, usar Retain o Delete
+#
+# 4. STORAGE CLASSES:
+#    - Permiten aprovisionamiento dinámico
+#    - Diferentes clases para diferentes necesidades (SSD, HDD, etc.)
+#    - volumeBindingMode controla cuándo se provisiona
+#
+# 5. VOLUME BINDING MODES:
+#    - Immediate: provisiona al crear PVC
+#    - WaitForFirstConsumer: provisiona al crear Pod (mejor para topología)
+#
+# 6. EXPANSION:
+#    - allowVolumeExpansion: true permite expandir volúmenes
+#    - Solo se puede aumentar, nunca reducir
+#    - Requiere soporte del provisioner
+#
+# 7. LIMITACIONES:
+#    - No todos los provisioners soportan todos los access modes
+#    - RWX generalmente requiere almacenamiento compartido (NFS, CephFS)
+#    - HostPath solo funciona en un nodo (no producción)
+#
+# 8. MEJORES PRÁCTICAS:
+#    - Usar StorageClasses para aprovisionamiento dinámico
+#    - No usar hostPath en producción
+#    - Configurar backups para datos importantes
+#    - Usar WaitForFirstConsumer para mejor topología
+#    - Documentar requisitos de almacenamiento
+#    - Monitorear uso de almacenamiento
+#
+# 9. TROUBLESHOOTING:
+#    - PVC en Pending: verificar PV disponible, StorageClass, access modes
+#    - Pod no inicia: verificar PVC bound, permisos, nodo correcto
+#    - Datos no persisten: verificar reclaimPolicy, PVC no eliminado
+
+# ============================================================================
+# FIN DE PERSISTENTVOLUME Y PERSISTENTVOLUMECLAIM
+# ============================================================================

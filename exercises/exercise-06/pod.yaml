@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-pod
+  labels:
+    app: secret-demo
+spec:
+  containers:
+  - name: app
+    image: busybox:latest
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Reading secrets from mounted files ==="
+        echo "Username: $(cat /etc/secrets/username)"
+        echo "Password: $(cat /etc/secrets/password)"
+        echo "API Token: $(cat /etc/secrets/api-token)"
+        echo "=========================================="
+        ls -la /etc/secrets/
+        sleep 3600
+    volumeMounts:
+    - name: secret-volume
+      mountPath: /etc/secrets
+      readOnly: true
+  volumes:
+  - name: secret-volume
+    secret:
+      secretName: app-secret

@@ -1,0 +1,86 @@
+# a deployment of a mariadb database
+# a service to expose the mariadb databaseç
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb-deployment
+  labels:
+    app: mariadb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      containers:
+        - name: mariadb
+          image: docker.io/library/mariadb:latest
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-secret
+                  key: MARIADB_ROOT_PASSWORD
+            - name: MARIADB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: mariadb-config
+                  key: MARIADB_USER
+            - name: MARIADB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mariadb-secret
+                  key: MARIADB_PASSWORD
+            - name: MARIADB_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: mariadb-config
+                  key: MARIADB_DATABASE
+          volumeMounts:
+            - name: mariadb-data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mariadb-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-service
+spec:
+  selector:
+    app: mariadb
+  ports:
+    - name: mysql
+      protocol: TCP
+      port: 3306
+      targetPort: 3306
+  type: LoadBalancer
+--- 
+
+  # configmap to store mariadb user and database name
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: mariadb-config
+  data:
+    MARIADB_USER: myuser
+    MARIADB_DATABASE: mydatabase
+---
+
+# secret to store mariadb passwords
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb-secret
+type: Opaque
+data:
+  MARIADB_ROOT_PASSWORD: bXlyb290cGFzc3dvcmQ=   # "myrootpassword"
+  MARIADB_PASSWORD: bXl1c2VycGFzc3dvcmQ=         # "myuserpassword"

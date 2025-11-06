@@ -1,0 +1,664 @@
+# ============================================================================
+# STATEFULSET DE KUBERNETES - EJEMPLO COMPLETO CON TODOS LOS APARTADOS
+# ============================================================================
+# Un StatefulSet gestiona Pods con identidades únicas y persistentes.
+# Ideal para aplicaciones stateful: bases de datos, sistemas distribuidos, etc.
+# Garantiza orden en el despliegue, escalado y eliminación de Pods.
+# ============================================================================
+
+# Versión de la API
+apiVersion: apps/v1
+
+# Tipo de recurso
+kind: StatefulSet
+
+# ============================================================================
+# METADATA: Información de identificación del StatefulSet
+# ============================================================================
+metadata:
+  # Nombre único del StatefulSet
+  name: mi-statefulset
+  
+  # Namespace
+  namespace: default
+  
+  # Labels del StatefulSet
+  labels:
+    app: base-datos
+    version: v1
+    tier: database
+    component: postgres
+  
+  # Annotations
+  annotations:
+    description: "StatefulSet para cluster de PostgreSQL"
+    contact: "dba@empresa.com"
+    kubernetes.io/change-cause: "Implementación inicial del cluster de BD"
+
+# ============================================================================
+# SPEC: Especificación del StatefulSet
+# ============================================================================
+spec:
+  # ========================================================================
+  # RÉPLICAS: Número de Pods stateful deseados
+  # ========================================================================
+  replicas: 3
+  
+  # ========================================================================
+  # SERVICE NAME: Nombre del servicio headless que gobierna este StatefulSet
+  # ========================================================================
+  # CRÍTICO: Debe existir un Service tipo ClusterIP con clusterIP: None
+  # Proporciona identidad de red estable: <podname>.<servicename>.<namespace>.svc.cluster.local
+  serviceName: postgres-headless
+  
+  # ========================================================================
+  # SELECTOR: Define qué Pods gestiona este StatefulSet
+  # ========================================================================
+  selector:
+    matchLabels:
+      app: base-datos
+      component: postgres
+    matchExpressions:
+    - key: tier
+      operator: In
+      values:
+      - database
+  
+  # ========================================================================
+  # POD MANAGEMENT POLICY: Política de gestión de Pods
+  # ========================================================================
+  # - OrderedReady (default): Crea/elimina Pods en orden secuencial (0,1,2...)
+  # - Parallel: Crea/elimina todos los Pods simultáneamente
+  podManagementPolicy: OrderedReady
+  
+  # ========================================================================
+  # UPDATE STRATEGY: Estrategia de actualización
+  # ========================================================================
+  updateStrategy:
+    # Tipo: RollingUpdate (default) o OnDelete
+    type: RollingUpdate
+    
+    rollingUpdate:
+      # Número de partición - solo Pods con ordinal >= partition se actualizan
+      # Útil para actualizaciones canary/staged
+      # Por ejemplo, partition: 2 solo actualiza los Pods 2, 3, 4...
+      partition: 0
+      
+      # Número máximo de Pods no disponibles durante la actualización
+      maxUnavailable: 1
+  
+  # ========================================================================
+  # MINIMUM READY SECONDS
+  # ========================================================================
+  minReadySeconds: 10
+  
+  # ========================================================================
+  # REVISION HISTORY LIMIT
+  # ========================================================================
+  revisionHistoryLimit: 10
+  
+  # ========================================================================
+  # PERSISTENT VOLUME CLAIM RETENTION POLICY
+  # ========================================================================
+  # Controla qué hacer con los PVCs cuando se eliminan los Pods
+  # Disponible desde Kubernetes 1.23+
+  persistentVolumeClaimRetentionPolicy:
+    # whenDeleted: qué hacer cuando se elimina el StatefulSet
+    # - Retain (default): mantener los PVCs
+    # - Delete: eliminar los PVCs
+    whenDeleted: Retain
+    
+    # whenScaled: qué hacer cuando se reduce el número de réplicas
+    # - Retain (default): mantener los PVCs
+    # - Delete: eliminar los PVCs
+    whenScaled: Retain
+  
+  # ========================================================================
+  # TEMPLATE: Plantilla de Pods
+  # ========================================================================
+  template:
+    metadata:
+      labels:
+        app: base-datos
+        component: postgres
+        tier: database
+        version: v1
+      
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        backup.velero.io/backup-volumes: "data"
+    
+    spec:
+      # ==================================================================
+      # CONTENEDORES
+      # ==================================================================
+      containers:
+      - name: postgres
+        image: postgres:14-alpine
+        imagePullPolicy: IfNotPresent
+        
+        # Puertos
+        ports:
+        - name: postgres
+          containerPort: 5432
+          protocol: TCP
+        
+        # Variables de entorno
+        env:
+        - name: POSTGRES_DB
+          value: "mydb"
+        
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: username
+        
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: password
+        
+        # Nombre del Pod (importante para identidad en cluster)
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        
+        # Namespace del Pod
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        
+        # IP del Pod
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        
+        # Configuración de PostgreSQL desde ConfigMap
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        
+        # Recursos
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+            ephemeral-storage: "2Gi"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+            ephemeral-storage: "4Gi"
+        
+        # Liveness Probe - verifica si PostgreSQL responde
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Readiness Probe - verifica si puede aceptar conexiones
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Startup Probe
+        startupProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 30
+        
+        # Lifecycle hooks
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                # Shutdown graceful de PostgreSQL
+                su - postgres -c "pg_ctl stop -D $PGDATA -m fast"
+        
+        # Volúmenes montados
+        volumeMounts:
+        # Volumen persistente para datos de PostgreSQL
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        
+        # ConfigMap con configuración de PostgreSQL
+        - name: postgres-config
+          mountPath: /etc/postgresql
+          readOnly: true
+        
+        # Secret con certificados SSL
+        - name: postgres-certs
+          mountPath: /etc/ssl/postgres
+          readOnly: true
+        
+        # Volumen para scripts de inicialización
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+        
+        # Contexto de seguridad
+        securityContext:
+          runAsUser: 999  # Usuario postgres
+          runAsGroup: 999
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # PostgreSQL necesita escribir
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+      
+      # Contenedor sidecar para métricas de PostgreSQL
+      - name: postgres-exporter
+        image: prometheuscommunity/postgres-exporter:latest
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - name: metrics
+          containerPort: 9187
+          protocol: TCP
+        
+        env:
+        - name: DATA_SOURCE_NAME
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/$(POSTGRES_DB)?sslmode=disable"
+        
+        envFrom:
+        - secretRef:
+            name: postgres-secrets
+        
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      
+      # Contenedor sidecar para backups
+      - name: backup-agent
+        image: wal-g/wal-g:latest
+        imagePullPolicy: IfNotPresent
+        
+        env:
+        - name: PGHOST
+          value: "localhost"
+        - name: PGPORT
+          value: "5432"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: backup-credentials
+              key: access-key
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backup-credentials
+              key: secret-key
+        - name: WALG_S3_PREFIX
+          value: "s3://my-backups/postgres"
+        
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+          readOnly: true
+        
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      
+      # ==================================================================
+      # INIT CONTAINERS
+      # ==================================================================
+      initContainers:
+      # Init container para verificar permisos del volumen
+      - name: init-chmod
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          chown -R 999:999 /var/lib/postgresql/data
+          chmod 700 /var/lib/postgresql/data
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        securityContext:
+          runAsUser: 0  # Necesita root para cambiar permisos
+      
+      # Init container para esperar dependencias
+      - name: init-wait-for-service
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          # Esperar a que el servicio headless esté disponible
+          until nslookup postgres-headless.default.svc.cluster.local; do
+            echo "Esperando servicio headless..."
+            sleep 2
+          done
+      
+      # ==================================================================
+      # VOLÚMENES ESTÁTICOS (no PVCs)
+      # ==================================================================
+      volumes:
+      # ConfigMap con configuración de PostgreSQL
+      - name: postgres-config
+        configMap:
+          name: postgres-config
+          defaultMode: 0644
+          items:
+          - key: postgresql.conf
+            path: postgresql.conf
+          - key: pg_hba.conf
+            path: pg_hba.conf
+      
+      # Secret con certificados SSL
+      - name: postgres-certs
+        secret:
+          secretName: postgres-tls
+          defaultMode: 0400
+          items:
+          - key: tls.crt
+            path: server.crt
+          - key: tls.key
+            path: server.key
+      
+      # ConfigMap con scripts de inicialización
+      - name: init-scripts
+        configMap:
+          name: postgres-init-scripts
+          defaultMode: 0755
+      
+      # ==================================================================
+      # CONFIGURACIÓN DE RED
+      # ==================================================================
+      dnsPolicy: ClusterFirst
+      
+      dnsConfig:
+        searches:
+        - default.svc.cluster.local
+        - svc.cluster.local
+        options:
+        - name: ndots
+          value: "2"
+      
+      # IMPORTANTE: StatefulSets requieren hostname único
+      # Se genera automáticamente: <statefulset-name>-<ordinal>
+      # Por ejemplo: mi-statefulset-0, mi-statefulset-1, mi-statefulset-2
+      
+      # No usar hostNetwork con StatefulSets normalmente
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+      
+      # ==================================================================
+      # SERVICE ACCOUNT Y SEGURIDAD
+      # ==================================================================
+      serviceAccountName: postgres-sa
+      automountServiceAccountToken: true
+      
+      securityContext:
+        fsGroup: 999  # Grupo postgres
+        fsGroupChangePolicy: "OnRootMismatch"
+        runAsUser: 999
+        runAsGroup: 999
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+        sysctls:
+        - name: net.core.somaxconn
+          value: "1024"
+      
+      # ==================================================================
+      # SCHEDULING
+      # ==================================================================
+      
+      # Selector de nodos
+      nodeSelector:
+        disktype: ssd
+        storage: high-performance
+      
+      # Afinidad
+      affinity:
+        # Node Affinity - preferir nodos en ciertas zonas
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/zone
+                operator: In
+                values:
+                - us-east-1a
+                - us-east-1b
+                - us-east-1c
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - storage-optimized
+        
+        # Pod Anti-Affinity - distribuir réplicas en diferentes nodos
+        # IMPORTANTE para alta disponibilidad en StatefulSets
+        podAntiAffinity:
+          # Hard requirement: NO dos Pods en el mismo nodo
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: base-datos
+                component: postgres
+            topologyKey: kubernetes.io/hostname
+          
+          # Soft preference: distribuir entre zonas
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: base-datos
+              topologyKey: kubernetes.io/zone
+      
+      # Tolerations
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+      - key: "dedicated"
+        operator: "Equal"
+        value: "database"
+        effect: "NoSchedule"
+      - key: "storage-node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      
+      # Prioridad alta para bases de datos
+      priorityClassName: database-priority
+      
+      # Distribución de topología
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: base-datos
+            component: postgres
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: base-datos
+            component: postgres
+      
+      # ==================================================================
+      # POLÍTICAS
+      # ==================================================================
+      
+      # CRÍTICO: StatefulSets SIEMPRE usan restartPolicy: Always
+      restartPolicy: Always
+      
+      # Tiempo de gracia extendido para shutdown de BD
+      terminationGracePeriodSeconds: 60
+      
+      # Política de preempción
+      preemptionPolicy: PreemptLowerPriority
+      
+      # ==================================================================
+      # RUNTIME
+      # ==================================================================
+      runtimeClassName: runc
+      
+      overhead:
+        memory: "50Mi"
+        cpu: "20m"
+      
+      # ==================================================================
+      # OTRAS CONFIGURACIONES
+      # ==================================================================
+      imagePullSecrets:
+      - name: registry-credentials
+      
+      enableServiceLinks: true
+      shareProcessNamespace: false
+      setHostnameAsFQDN: false
+      
+      os:
+        name: linux
+  
+  # ========================================================================
+  # VOLUME CLAIM TEMPLATES: Plantillas de PVCs
+  # ========================================================================
+  # CRÍTICO: Cada Pod obtiene su propio PVC único y persistente
+  # El nombre del PVC será: <template-name>-<statefulset-name>-<ordinal>
+  # Ejemplo: data-mi-statefulset-0, data-mi-statefulset-1, etc.
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        app: base-datos
+        component: postgres
+      annotations:
+        volume.beta.kubernetes.io/storage-class: "fast-ssd"
+    
+    spec:
+      # Modos de acceso
+      accessModes:
+      - ReadWriteOnce  # RWO: un nodo puede montar para lectura/escritura
+      # Otros: ReadOnlyMany (ROX), ReadWriteMany (RWX)
+      
+      # Storage class - define el tipo de almacenamiento
+      storageClassName: fast-ssd
+      
+      # Recursos solicitados
+      resources:
+        requests:
+          storage: 20Gi
+      
+      # Selector de volumen (opcional)
+      selector:
+        matchLabels:
+          type: ssd
+      
+      # Modo de volumen
+      volumeMode: Filesystem  # o Block
+      
+      # Fuente de datos (opcional) - para clonar o restaurar
+      # dataSource:
+      #   name: existing-snapshot
+      #   kind: VolumeSnapshot
+      #   apiGroup: snapshot.storage.k8s.io
+
+# ============================================================================
+# STATUS: Estado del StatefulSet (solo lectura, gestionado por Kubernetes)
+# ============================================================================
+# status:
+#   observedGeneration: 1
+#   replicas: 3
+#   readyReplicas: 3
+#   currentReplicas: 3
+#   updatedReplicas: 3
+#   currentRevision: mi-statefulset-5d4f7c8b9d
+#   updateRevision: mi-statefulset-5d4f7c8b9d
+#   collisionCount: 0
+#   conditions:
+#   - type: Available
+#     status: "True"
+#     lastTransitionTime: 2025-10-27T10:00:00Z
+
+# ============================================================================
+# CARACTERÍSTICAS IMPORTANTES DE STATEFULSETS
+# ============================================================================
+# 1. IDENTIDAD ESTABLE:
+#    - Nombre predecible: <statefulset-name>-<ordinal> (0, 1, 2...)
+#    - DNS estable: <pod-name>.<service-name>.<namespace>.svc.cluster.local
+#    - Ejemplo: mi-statefulset-0.postgres-headless.default.svc.cluster.local
+#
+# 2. ALMACENAMIENTO PERSISTENTE:
+#    - Cada Pod tiene su propio PVC único
+#    - Los PVCs persisten incluso si se elimina el Pod
+#    - Al recrear el Pod, se reconecta al mismo PVC
+#
+# 3. ORDEN GARANTIZADO:
+#    - Despliegue: 0 → 1 → 2 (secuencial)
+#    - Escalado: igual secuencial
+#    - Eliminación: 2 → 1 → 0 (orden inverso)
+#    - Actualización: según updateStrategy
+#
+# 4. CASOS DE USO:
+#    - Bases de datos: PostgreSQL, MySQL, MongoDB
+#    - Sistemas distribuidos: Kafka, Zookeeper, etcd
+#    - Aplicaciones que requieren identidad única
+#    - Aplicaciones con datos persistentes importantes
+#
+# 5. REQUISITOS:
+#    - DEBE existir un Service headless (clusterIP: None)
+#    - DEBE definir serviceName
+#    - DEBE usar PVCs o volumeClaimTemplates
+#
+# 6. LIMITACIONES:
+#    - Más complejo que Deployments
+#    - Eliminación de volúmenes es manual (por seguridad)
+#    - Requiere más cuidado en actualizaciones
+
+# ============================================================================
+# FIN DEL STATEFULSET
+# ============================================================================

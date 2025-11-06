@@ -1,0 +1,47 @@
+services:
+  app:
+    image: ng_dc:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ng_volume:/usr/share/nginx/html
+    networks:
+      - mynetwork
+    depends_on:
+      - mariadb
+    deploy:
+        resources:
+          limits:
+            cpus: '0.5'
+            memory: 512M
+          reservations:
+            cpus: '0.1'
+            memory: 256M
+        replicas: 2
+        restart_policy:
+            condition: on-failure
+            delay: 3s
+            max_attempts: 5
+            window: 60s
+  mariadb:
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mydb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    networks:
+      - mynetwork
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+volumes:
+  ng_volume:
+    driver: local
+  db_data:
+    driver: local
+networks:
+  mynetwork:
+    driver: bridge
+  

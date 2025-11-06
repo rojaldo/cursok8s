@@ -1,0 +1,968 @@
+= Comandos de OpenShift
+
+== Comandos Básicos con Parámetros Detallados
+
+=== login
+Permite autenticarse en el clúster de OpenShift. Admite varios parámetros para diferentes métodos de autenticación.
+Ejemplos y parámetros:
+  oc login [--username=<usuario>] [--password=<contraseña>] [--server=<URL>] [--token=<token>] [--certificate-authority=<archivo_CA>] [--insecure-skip-tls-verify] [--kubeconfig=<archivo>]
+- --username/-u: Nombre de usuario para autenticación básica.
+- --password/-p: Contraseña correspondiente al usuario.
+- --server: URL del servidor OpenShift (por ejemplo, https://api.ejemplo.com:6443).
+- --token: Token de autenticación (alternativa a usuario/contraseña).
+- --certificate-authority: Ruta al archivo de la autoridad certificadora (CA).
+- --insecure-skip-tls-verify: Omite la verificación del certificado TLS.
+- --kubeconfig: Especifica el archivo de configuración a usar[1][3][5][6][8].
+
+=== new-project
+Crea un nuevo proyecto (namespace) en OpenShift.
+Sintaxis:
+  oc new-project <nombre> [--display-name="<nombre visible>"] [--description="<descripción>"]
+- <nombre>: Nombre único del proyecto.
+- --display-name: Nombre descriptivo para mostrar.
+- --description: Descripción del proyecto.
+
+=== new-app
+Despliega una nueva aplicación a partir de una imagen, plantilla o repositorio.
+Sintaxis:
+  oc new-app <fuente> [opciones]
+Parámetros comunes:
+- <fuente>: Imagen, plantilla, o repositorio Git (por ejemplo, https://github.com/org/repo.git).
+- --name=<nombre>: Nombre de la aplicación.
+- -e, --env=<clave>=<valor>: Variables de entorno.
+- --param=<clave>=<valor>: Parámetros para plantillas.
+- --param-file=<archivo>: Archivo con parámetros para la plantilla[10].
+
+Ejemplo:
+  oc new-app https://github.com/usuario/app.git --name=miapp -e ENV=prod
+
+=== status
+Muestra el estado general de los recursos en el proyecto actual.
+Sintaxis:
+  oc status [opciones]
+Parámetros útiles:
+- --suggest: Sugerencias para mejorar el estado.
+- --revision: Muestra la revisión del despliegue.
+
+=== project
+Cambia el proyecto (namespace) activo.
+Sintaxis:
+  oc project <nombre-del-proyecto>
+Parámetros:
+- <nombre-del-proyecto>: Nombre del proyecto al que se desea cambiar.
+
+=== projects
+Lista todos los proyectos a los que el usuario tiene acceso.
+Sintaxis:
+  oc projects
+Sin parámetros adicionales.
+
+=== explain
+Muestra la documentación y estructura de los recursos de OpenShift.
+Sintaxis:
+  oc explain <tipo-de-recurso> [--recursive] [--api-version=<versión>]
+Parámetros:
+- <tipo-de-recurso>: Por ejemplo, pod, deployment, service, etc.
+- --recursive: Muestra la estructura completa y subcampos.
+- --api-version: Especifica la versión de la API para el recurso.
+
+Ejemplo:
+  oc explain deployment --recursive
+
+
+== Comandos de Construcción y Despliegue
+
+A continuación se detallan los comandos de OpenShift para gestionar despliegues y construcciones, junto con sus parámetros más relevantes:
+
+=== rollout
+Gestiona el ciclo de vida de los despliegues (deployments o deploymentconfigs).
+
+- Estado del despliegue:
+  oc rollout status dc/<nombre> [--watch] [--revision=<número>]
+- Iniciar manualmente un despliegue:
+  oc rollout latest dc/<nombre>
+- Ver historial de despliegues:
+  oc rollout history dc/<nombre> [--revision=<número>]
+- Reintentar un despliegue fallido:
+  oc rollout retry dc/<nombre>
+- Deshacer (rollback) un despliegue:
+  oc rollout undo dc/<nombre> [--to-revision=<número>]
+
+Parámetros frecuentes:
+- --watch: Espera a que el despliegue termine.
+- --revision: Especifica una revisión concreta.
+- --to-revision: Revierta al número de revisión indicado[1][3][9].
+
+=== rollback
+Revierte una aplicación a una versión anterior del despliegue.
+
+Sintaxis:
+  oc rollback <nombre> [--to-version=<número>]
+Parámetros:
+- <nombre>: Nombre del deploymentconfig.
+- --to-version: Número de versión al que volver (opcional, si no se indica, revierte a la última versión exitosa)[2][5][6].
+
+=== new-build
+Crea una nueva configuración de build (buildconfig) a partir de código fuente, imágenes o Dockerfiles.
+
+Sintaxis:
+  oc new-build <fuente> [opciones]
+Parámetros:
+- <fuente>: Repositorio Git, imagen, Dockerfile, etc.
+- --name=<nombre>: Nombre del buildconfig.
+- --binary: Indica que el código fuente se subirá manualmente.
+- --strategy=<estrategia>: Estrategia de build (docker, source, pipeline).
+- --env=<clave>=<valor>: Variables de entorno para el build[2].
+
+Ejemplo:
+  oc new-build https://github.com/usuario/app.git --name=mi-build --strategy=source
+
+=== start-build
+Inicia manualmente una construcción (build) a partir de un buildconfig existente.
+
+Sintaxis:
+  oc start-build <buildconfig> [opciones]
+Parámetros:
+- <buildconfig>: Nombre del buildconfig.
+- --from-dir=<directorio>: Sube el contenido de un directorio como fuente.
+- --from-file=<archivo>: Sube un archivo fuente.
+- --follow: Muestra los logs en tiempo real.
+- --wait: Espera a que la build finalice.
+- --env=<clave>=<valor>: Variables de entorno para la build[2].
+
+Ejemplo:
+  oc start-build mi-build --from-dir=./src --follow
+
+=== cancel-build
+Cancela una construcción en curso o pendiente.
+
+Sintaxis:
+  oc cancel-build <nombre|buildconfig> [opciones]
+Parámetros:
+- <nombre>: Nombre del build o buildconfig.
+- --state=<estado>: Cancela builds en un estado específico (ej: new, pending, running).
+- --dump-logs: Muestra los logs antes de cancelar[2].
+
+Ejemplo:
+  oc cancel-build python-1
+  oc cancel-build buildconfig/python --state=pending
+
+=== import-image
+Importa etiquetas e información de imágenes desde un repositorio externo.
+
+Sintaxis:
+  oc import-image <nombre> [opciones]
+Parámetros:
+- <nombre>: Nombre del recurso de imagen.
+- --from=<fuente>: Ruta del repositorio de imágenes.
+- --confirm: Confirma la importación de nuevas etiquetas.
+- --scheduled: Habilita la importación periódica[2].
+
+Ejemplo:
+  oc import-image my-ruby --from=registry.io/mi-imagen --confirm
+
+=== tag
+Crea, actualiza o elimina etiquetas (tags) de imágenes.
+
+Sintaxis:
+  oc tag <origen> <destino> [opciones]
+Parámetros:
+- <origen>: Imagen o tag de origen (ej: imagen:etiqueta).
+- <destino>: Imagen o tag de destino.
+- --scheduled: Habilita la actualización automática.
+- --reference: Crea una referencia en vez de copiar la imagen.
+- --delete: Elimina una etiqueta existente[2][17].
+
+Ejemplo:
+  oc tag myimage:latest myimage:prod
+  oc tag --delete myimage:old
+
+
+
+== Comandos de Gestión de Aplicaciones
+
+=== create
+Crea recursos a partir de archivos de definición o directamente desde la línea de comandos.
+Sintaxis:
+  oc create -f <archivo.yaml>
+  oc create <tipo> <nombre> [parámetros]
+Parámetros principales:
+- -f, --filename=<archivo>: Archivo(s) de definición.
+- --dry-run: Simula la creación.
+- --edit: Permite editar antes de crear.
+
+Ejemplo:
+  oc create -f deployment.yaml
+
+=== apply
+Aplica cambios declarativos a recursos definidos en archivos.
+Sintaxis:
+  oc apply -f <archivo.yaml>
+Parámetros principales:
+- -f, --filename=<archivo>: Archivo(s) de definición.
+- --prune: Elimina recursos no definidos en el archivo.
+- --dry-run: Simula la aplicación.
+
+Ejemplo:
+  oc apply -f service.yaml
+
+=== get
+Obtiene información sobre recursos del clúster.
+Sintaxis:
+  oc get <tipo> [<nombre>] [opciones]
+Parámetros principales:
+- -o, --output=<formato>: Formato de salida (yaml, json, wide, name).
+- -w, --watch: Observa cambios en tiempo real.
+- --selector=<selector>: Filtra por etiquetas.
+
+Ejemplo:
+  oc get pods -o wide
+
+=== describe
+Muestra detalles completos de un recurso.
+Sintaxis:
+  oc describe <tipo> <nombre>
+Parámetros principales:
+- --show-events: Muestra eventos relacionados.
+
+Ejemplo:
+  oc describe deployment mi-app
+
+=== edit
+Abre el recurso en un editor para modificarlo en vivo.
+Sintaxis:
+  oc edit <tipo> <nombre>
+
+Ejemplo:
+  oc edit service mi-servicio
+
+=== Comandos `oc set` en OpenShift
+
+A continuación se detallan los subcomandos más relevantes de `oc set` con ejemplos prácticos:
+
+==== image
+Actualiza la imagen de un contenedor en recursos con plantillas de pods:
+
+[source, bash]
+----
+oc set image deployment/mi-app contenedor=imagen:v2
+----
+
+==== resources
+Configura límites y solicitudes de recursos:
+
+[source, bash]
+----
+oc set resources deployment/mi-app --limits=cpu=1,memory=512Mi --requests=cpu=200m,memory=128Mi
+----
+
+==== build-hook
+Define hooks post-commit para builds:
+
+[source, bash]
+----
+oc set build-hook bc/mi-build --post-commit --command -- ./run-tests.sh
+----
+
+==== build-secret
+Asocia secrets a builds:
+
+[source, bash]
+----
+oc set build-secret --source bc/mi-build mi-secreto
+----
+
+==== env
+Gestiona variables de entorno:
+
+[source, bash]
+----
+oc set env deployment/mi-app DEBUG=true
+----
+
+==== image-lookup
+Habilita resolución de imágenes locales:
+
+[source, bash]
+----
+oc set image-lookup mysql
+----
+
+==== probe
+Configura sondas de salud:
+
+[source, bash]
+----
+oc set probe deployment/mi-app --liveness --get-url=http://:8080/health
+----
+
+==== deployment-hook
+Define hooks para DeploymentConfigs:
+
+[source, bash]
+----
+oc set deployment-hook dc/mi-app --pre --fail-on-error -- /scripts/pre-deploy.sh
+----
+
+==== triggers
+Gestiona triggers automáticos:
+
+[source, bash]
+----
+oc set triggers dc/mi-app --manual
+----
+
+==== volumes
+Administra volúmenes en pods:
+
+[source, bash]
+----
+oc set volumes deployment/mi-app --add --name=datos --mount-path=/data --type=emptyDir
+----
+
+==== serviceaccount
+Actualiza la ServiceAccount:
+
+[source, bash]
+----
+oc set serviceaccount deployment/mi-app mi-sa
+----
+
+==== route-backends
+Ajusta balanceo de tráfico:
+
+[source, bash]
+----
+oc set route-backends mi-ruta backend-a=80% backend-b=20%
+----
+
+==== selector
+Modifica selectores de recursos:
+
+[source, bash]
+----
+oc set selector service/mi-servicio app=backend
+----
+
+==== subject
+Gestiona el usuario o grupo de un RoleBinding: 
+
+[source, bash]
+----
+oc set rolebinding mi-rb --user=usuario1
+----
+
+==== Consejos de uso
+.Previsualice cambios con `--dry-run`:
+[source, bash]
+----
+oc set env deployment/mi-aplicacion -o yaml --dry-run=client DEBUG=true
+----
+Combine con `oc patch` para modificaciones complejas
+.Usa `oc explain` para ver estructuras de recursos:
+[source, bash]
+----
+oc explain deployment.spec.template.spec.containers
+----
+    
+
+=== label
+Agrega, modifica o elimina etiquetas en recursos.
+Sintaxis:
+  oc label <tipo> <nombre> <clave>=<valor> [opciones]
+Parámetros principales:
+- --overwrite: Sobrescribe etiquetas existentes.
+- --all: Aplica a todos los recursos del tipo.
+
+Ejemplo:
+  oc label pod mi-pod env=produccion
+
+=== annotate
+Agrega o modifica anotaciones en recursos.
+Sintaxis:
+  oc annotate <tipo> <nombre> <clave>=<valor> [opciones]
+Parámetros principales:
+- --overwrite: Sobrescribe anotaciones existentes.
+- --all: Aplica a todos los recursos del tipo.
+
+Ejemplo:
+  oc annotate svc mi-servicio description="Servicio principal"
+
+=== expose
+Crea un recurso Service o Route para exponer aplicaciones.
+Sintaxis:
+  oc expose <recurso> [opciones]
+Parámetros principales:
+- --port=<puerto>: Puerto a exponer.
+- --target-port=<puerto>: Puerto objetivo en el contenedor.
+- --name=<nombre>: Nombre del recurso expuesto.
+- --type=<tipo>: Tipo de servicio (ClusterIP, NodePort, LoadBalancer).
+
+Ejemplo:
+  oc expose deployment/mi-app --port=8080 --name=mi-servicio
+
+=== delete
+Elimina uno o varios recursos.
+Sintaxis:
+  oc delete <tipo> <nombre> [opciones]
+Parámetros principales:
+- -f, --filename=<archivo>: Archivo de recurso a eliminar.
+- --all: Elimina todos los recursos del tipo especificado.
+- --selector=<selector>: Elimina recursos por etiqueta.
+
+Ejemplo:
+  oc delete pod mi-pod
+
+=== scale
+Escala el número de réplicas de un recurso.
+Sintaxis:
+  oc scale <tipo>/<nombre> --replicas=<número>
+Parámetros principales:
+- --replicas: Número deseado de réplicas.
+
+Ejemplo:
+  oc scale deployment/mi-app --replicas=5
+
+=== autoscale
+Crea o modifica un autoscaler horizontal (HPA) para ajustar automáticamente el número de réplicas.
+Sintaxis:
+  oc autoscale <tipo>/<nombre> --min=<mín> --max=<máx> --cpu-percent=<umbral>
+Parámetros principales:
+- --min: Réplicas mínimas.
+- --max: Réplicas máximas.
+- --cpu-percent: Porcentaje de uso de CPU para escalar.
+
+Ejemplo:
+  oc autoscale deployment/mi-app --min=2 --max=10 --cpu-percent=80
+
+=== secrets
+Gestiona secretos para almacenar información sensible.
+Subcomandos:
+- oc create secret generic <nombre> --from-literal=<clave>=<valor>
+- oc get secrets
+- oc describe secret <nombre>
+- oc delete secret <nombre>
+
+Ejemplo:
+  oc create secret generic mi-secreto --from-literal=clave=valor
+
+
+== Comandos de Diagnóstico y Depuración
+
+A continuación se describen los comandos de OpenShift más utilizados para diagnóstico y depuración de aplicaciones y recursos:
+
+=== logs
+Muestra los logs de un pod o build.
+Sintaxis:
+  oc logs <nombre-pod> [opciones]
+Parámetros principales:
+- -f, --follow: Muestra los logs en tiempo real.
+- -c, --container=<nombre>: Especifica el contenedor.
+- --previous: Muestra logs del contenedor anterior.
+
+Ejemplo:
+  oc logs mi-pod -f -c app
+
+=== rsh
+Abre una shell interactiva dentro de un pod.
+Sintaxis:
+  oc rsh <nombre-pod> [comando]
+Parámetros principales:
+- -c, --container=<nombre>: Especifica el contenedor.
+
+Ejemplo:
+  oc rsh mi-pod
+
+=== rsync
+Sincroniza archivos entre el sistema local y un pod.
+Sintaxis:
+  oc rsync <origen> <pod>:/<destino> [opciones]
+Parámetros principales:
+- --exclude=<patrón>: Excluye archivos/directorios.
+- --delete: Elimina archivos en destino que no están en origen.
+
+Ejemplo:
+  oc rsync ./carpeta mi-pod:/app
+
+=== port-forward
+Redirige puertos locales a un pod o servicio del clúster.
+Sintaxis:
+  oc port-forward <pod/servicio> <puerto-local>:<puerto-remoto>
+Parámetros principales:
+- --address=<dirección>: Dirección de escucha local.
+
+Ejemplo:
+  oc port-forward svc/mi-servicio 8080:80
+
+=== debug
+Crea un pod de depuración basado en un recurso existente.
+Sintaxis:
+  oc debug <recurso> [opciones]
+Parámetros principales:
+- --image=<imagen>: Imagen alternativa para el pod de debug.
+- --to-namespace=<ns>: Ejecuta el debug en otro namespace.
+
+Ejemplo:
+  oc debug pod/mi-pod
+
+=== exec
+Ejecuta un comando en un contenedor de un pod.
+Sintaxis:
+  oc exec <nombre-pod> [-c <nombre-contenedor>] -- <comando>
+Parámetros principales:
+- -c, --container=<nombre>: Especifica el contenedor.
+- -i: Entrada estándar.
+- -t: Asigna pseudo-TTY.
+
+Ejemplo:
+  oc exec mi-pod -- ls /app
+
+=== proxy
+Crea un proxy HTTP para acceder a la API de OpenShift desde localhost.
+Sintaxis:
+  oc proxy [opciones]
+Parámetros principales:
+- --port=<puerto>: Puerto local para el proxy.
+- --accept-hosts=<patrón>: Filtra hosts aceptados.
+
+Ejemplo:
+  oc proxy --port=8081
+
+=== attach
+Adjunta la entrada/salida estándar a un contenedor en ejecución.
+Sintaxis:
+  oc attach <nombre-pod> [-c <nombre-contenedor>] [opciones]
+Parámetros principales:
+- -c, --container=<nombre>: Especifica el contenedor.
+- -i: Entrada estándar.
+- -t: Asigna pseudo-TTY.
+
+Ejemplo:
+  oc attach mi-pod -c app
+
+=== run
+Crea y ejecuta un pod temporal para pruebas o tareas puntuales.
+Sintaxis:
+  oc run <nombre> --image=<imagen> [opciones]
+Parámetros principales:
+- --restart=<tipo>: never, on-failure, always.
+- --command: Ejecuta como comando.
+- -it: Interactivo con TTY.
+
+Ejemplo:
+  oc run debug-pod --image=busybox --restart=Never -it -- sh
+
+=== cp
+Copia archivos entre el sistema local y un pod.
+Sintaxis:
+  oc cp <origen> <destino> [opciones]
+Ejemplo:
+  oc cp ./archivo.txt mi-pod:/app/archivo.txt
+
+=== wait
+Espera a que un recurso alcance un estado específico.
+Sintaxis:
+  oc wait <tipo>/<nombre> --for=<condición> [opciones]
+Parámetros principales:
+- --timeout=<tiempo>: Tiempo máximo de espera.
+
+Ejemplo:
+  oc wait pod/mi-pod --for=condition=Ready --timeout=60s
+
+=== events
+Muestra los eventos recientes del clúster o proyecto.
+Sintaxis:
+  oc get events [opciones]
+Parámetros principales:
+- --sort-by=<campo>: Ordena los eventos por un campo.
+
+Ejemplo:
+  oc get events --sort-by='.lastTimestamp'
+
+
+== Comandos Avanzados de OpenShift
+
+=== adm
+Comandos administrativos para gestión del clúster (requieren permisos de cluster-admin).
+Subcomandos comunes:
+- oc adm policy: Gestiona políticas RBAC
+- oc adm taint: Modifica taints en nodos
+- oc adm top: Muestra métricas de recursos
+- oc adm certificate: Gestiona certificados
+- oc adm prune: Limpia recursos antiguos
+
+Ejemplo:
+  oc adm policy add-cluster-role-to-user admin usuario1
+
+=== replace
+Reemplaza completamente un recurso con una nueva definición.
+Sintaxis:
+  oc replace -f <archivo.yaml> [opciones]
+Parámetros:
+- --force: Fuerza el reemplazo incluso con conflictos
+- --cascade: Eliminación en cascada (true/false)
+
+Ejemplo:
+  oc replace -f deployment-v2.yaml --force
+
+=== patch
+Modifica campos específicos de un recurso sin reemplazarlo completamente.
+Sintaxis:
+  oc patch <tipo>/<nombre> --type=<tipo-parche> -p '<parche>'
+Parámetros:
+- --type: merge, strategic, json
+- -p: Parche en formato JSON/YAML
+
+Ejemplo:
+  oc patch deployment/mi-app -p '{"spec":{"replicas":3}}'
+
+=== process
+Procesa plantillas para generar configuraciones de recursos.
+Sintaxis:
+  oc process <plantilla> [parámetros]
+Parámetros:
+- -p, --param=<clave>=<valor>: Parámetros para la plantilla
+- -o, --output: Formato de salida
+
+Ejemplo:
+  oc process -f mi-plantilla.yaml -p NAMESPACE=dev
+
+=== extract
+Extrae contenido de recursos para migración o respaldo.
+Sintaxis:
+  oc extract <tipo>/<nombre> [opciones]
+Parámetros:
+- --keys: Claves específicas a extraer
+- --to: Directorio destino
+
+Ejemplo:
+  oc extract secret/mi-secreto --keys=token
+
+=== observe
+Observa cambios en recursos y ejecuta acciones (experimental).
+Sintaxis:
+  oc observe <tipo> [--<script>]
+Ejemplo:
+  oc observe pods -- ./mi-script.sh
+
+=== policy
+Gestiona políticas de seguridad (RBAC).
+Subcomandos:
+- oc policy add-role-to-user
+- oc policy remove-role-from-user
+- oc policy who-can
+
+Ejemplo:
+  oc policy add-role-to-user view usuario1
+
+=== auth
+Gestiona autenticación y autorización.
+Subcomandos:
+- oc auth can-i: Verifica permisos
+- oc auth reconcile: Sincroniza políticas
+
+Ejemplo:
+  oc auth can-i create pods
+
+=== image
+Gestiona imágenes de contenedores.
+Subcomandos:
+- oc image mirror: Copia imágenes entre registros
+- oc image info: Muestra metadatos de imagen
+- oc image append: Agrega capas a imágenes
+
+Ejemplo:
+  oc image mirror mi-imagen:v1 registry.com/nueva-imagen:v1
+
+=== registry
+Gestiona el registro interno de OpenShift.
+Subcomandos:
+- oc registry login: Autentica contra el registro
+- oc registry info: Muestra información del registro
+
+Ejemplo:
+  oc registry login --to=/tmp/auth.json
+
+=== idle
+Marca servicios para reducir consumo de recursos cuando no hay tráfico.
+Sintaxis:
+  oc idle <servicio> [opciones]
+Parámetros:
+- --resource-names: Nombres de recursos a idle
+
+Ejemplo:
+  oc idle svc/mi-servicio
+
+=== api-versions
+Lista las versiones de API soportadas por el clúster.
+Sintaxis:
+  oc api-versions
+
+=== api-resources
+Lista los tipos de recursos disponibles en el clúster.
+Sintaxis:
+  oc api-resources [opciones]
+Parámetros:
+- --verbs: Filtra por verbos (get, list, create)
+- --namespaced: Muestra solo recursos namespaced
+
+Ejemplo:
+  oc api-resources --namespaced=true
+
+=== cluster-info
+Muestra información básica del clúster.
+Sintaxis:
+  oc cluster-info [opciones]
+Subcomandos:
+- oc cluster-info dump: Exporta estado del clúster
+
+=== diff
+Compara configuración actual con archivos locales.
+Sintaxis:
+  oc diff -f <archivo.yaml> [opciones]
+Parámetros:
+- --server: Compara con versión en servidor
+
+Ejemplo:
+  oc diff -f deployment.yaml
+
+=== kustomize
+Construye recursos a partir de directorios Kustomize.
+Sintaxis:
+  oc kustomize <directorio> [opciones]
+Parámetros:
+- --enable-alpha-plugins: Habilita plugins experimentales
+
+Ejemplo:
+  oc kustomize overlays/prod | oc apply -f -
+
+
+== Comandos de Configuración
+
+=== get-token
+Obtiene el token de acceso actual del usuario autenticado.
+Sintaxis:
+  oc whoami -t
+Parámetros:
+- No requiere parámetros adicionales.
+Ejemplo:
+  oc whoami -t
+
+=== logout
+Cierra la sesión actual y elimina las credenciales almacenadas.
+Sintaxis:
+  oc logout
+Parámetros:
+- No requiere parámetros adicionales.
+Ejemplo:
+  oc logout
+
+=== config
+Gestiona la configuración del cliente de OpenShift (kubeconfig).
+Subcomandos principales:
+- oc config view: Muestra la configuración actual.
+- oc config set-context <nombre>: Cambia el contexto.
+- oc config use-context <nombre>: Selecciona un contexto.
+- oc config set-cluster <nombre> --server=<url>: Configura un clúster.
+- oc config set-credentials <usuario> --token=<token>: Configura credenciales.
+- oc config get-contexts: Lista los contextos disponibles.
+
+Ejemplo:
+  oc config view
+  oc config use-context mi-contexto
+
+=== whoami
+Muestra información sobre el usuario autenticado.
+Sintaxis:
+  oc whoami [opciones]
+Parámetros:
+- -t, --token: Muestra solo el token de acceso.
+- --show-server: Muestra la URL del servidor.
+
+Ejemplo:
+  oc whoami
+  oc whoami --show-server
+
+=== completion
+Genera scripts de autocompletado para shells compatibles.
+Sintaxis:
+  oc completion <shell>
+Parámetros:oc new-app -f https://raw.githubusercontent.com/sclorg/nginx-ex/master/openshift/templates/nginx.json
+- <shell>: bash, zsh, fish, powershell
+
+Ejemplo:
+  oc completion bash > /etc/bash_completion.d/oc
+
+
+== Otros Comandos
+
+=== plugin
+Gestiona y ejecuta plugins externos para extender la funcionalidad de la CLI de OpenShift.
+Sintaxis:
+  oc plugin [opciones] <comando>
+Parámetros principales:
+- list: Lista los plugins instalados y disponibles.
+- <nombre-plugin>: Ejecuta el plugin especificado.
+
+Ejemplo:
+  oc plugin list
+  oc plugin my-custom-plugin
+
+=== version
+Muestra la versión del cliente de OpenShift y, si está conectado, la versión del servidor.
+Sintaxis:
+  oc version [opciones]
+Parámetros principales:
+- --client: Muestra solo la versión del cliente.
+- --short: Muestra la versión en formato corto.
+
+Ejemplo:
+  oc version
+  oc version --client --short
+
+== Walking Through OpenShift
+
+En este apartado se muestra un recorrido práctico por OpenShift, utilizando los comandos más comunes para gestionar aplicaciones y recursos en un clúster. Los ejemplos incluyen creación de proyectos, despliegue de aplicaciones, gestión de builds y monitoreo del estado de los recursos.
+
+=== 1. Creación de un proyecto
+
+[source, bash]
+----
+oc new-project mi-proyecto --description="Proyecto de demostración" --display-name="Demo"
+----
+
+=== 2. Despliegue de una aplicación
+
+[source, bash]
+----
+oc new-app --template=nginx-example \
+  --name=mi-aplicacion \
+  --param=NAME=mi-aplicacion \
+  --param=IMAGE_STREAM_TAG=nginx:latest
+----
+
+*Parámetros clave:*
+- `--template`: Especifica la plantilla de despliegue.
+- `--param`: Define variables personalizadas.
+
+=== 3. Gestión de builds
+
+Iniciar un build manualmente:
+
+[source, bash]
+----
+oc start-build mi-aplicacion --follow --env=ENV=prod
+----
+
+Ejemplo de configuración avanzada (BuildConfig):
+
+[source, yaml]
+----
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: build-avanzado
+spec:
+  source:
+    git:
+      uri: https://github.com/sclorg/nginx-ex.git
+      ref: main
+  strategy:
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: nodejs:18
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
+  output:
+    to:
+      kind: ImageStreamTag
+      name: app:latest
+----
+
+=== 4. Monitoreo y diagnóstico
+
+Verificar el estado general del proyecto:
+
+[source, bash]
+----
+oc status
+----
+
+Inspeccionar recursos específicos:
+
+[source, bash]
+----
+oc get pods -w
+oc describe svc/mi-servicio
+----
+
+Acceso a logs:
+
+[source, bash]
+----
+oc logs dc/mi-aplicacion --tail=100 -f
+----
+
+=== 5. Exposición de la aplicación
+
+Crear una Route para acceso externo:
+
+[source, bash]
+----
+oc expose svc/mi-aplicacion --port=8080 --name=mi-route-publica
+----
+
+Verificar la ruta creada:
+
+[source, bash]
+----
+oc get route mi-route-publica -o jsonpath='{.spec.host}'
+----
+
+=== 6. Escalado y actualizaciones
+
+Escalado manual:
+
+[source, bash]
+----
+oc scale dc/mi-aplicacion --replicas=3
+----
+
+Actualización continua (rollout):
+
+[source, bash]
+----
+oc rollout latest dc/mi-aplicacion
+oc rollout status -w dc/mi-aplicacion
+----
+
+=== 7. Limpieza final
+
+.Eliminar todos los recursos del proyecto:
+[source, bash]
+----
+oc delete all --all
+oc delete project mi-proyecto
+----
+
+=== Consejos prácticos
+
+.Documentación en tiempo real:
+[source, bash]
+----
+oc explain deployment.spec.replicas
+----
+
+.Depuración interactiva:
+[source, bash]
+----
+oc debug pod/mi-pod -- /bin/sh
+----
+
+.Exportar configuraciones para control de versiones:
+[source, bash]
+----
+oc get dc/mi-aplicacion -o yaml > deployment-v1.yaml
+----

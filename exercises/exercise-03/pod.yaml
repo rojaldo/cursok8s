@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: emptydir-pod
+  labels:
+    app: emptydir-demo
+spec:
+  containers:
+  - name: writer
+    image: busybox:latest
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "Writing to shared volume at $(date)" > /data/shared-file.txt
+        echo "Content written successfully" >> /data/shared-file.txt
+        cat /data/shared-file.txt
+        sleep 3600
+    volumeMounts:
+    - name: shared-data
+      mountPath: /data
+  volumes:
+  - name: shared-data
+    emptyDir: {}

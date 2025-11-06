@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-emptydir
+spec:
+  containers:
+  - name: main-container
+    image: busybox
+    command: ["/bin/sh", "-c", "echo 'Hola desde emptyDir' > /mnt/emptydir/saludo.txt && sleep 3600"]
+    volumeMounts:
+    - name: emptydir-volume
+      mountPath: /mnt/emptydir
+  volumes:
+  - name: emptydir-volume
+    emptyDir: {}

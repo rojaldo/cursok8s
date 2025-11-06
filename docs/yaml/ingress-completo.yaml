@@ -1,0 +1,720 @@
+# ============================================================================
+# INGRESS DE KUBERNETES - EJEMPLO COMPLETO CON TODOS LOS APARTADOS
+# ============================================================================
+# Un Ingress gestiona el acceso HTTP y HTTPS externo a servicios dentro del
+# cluster. Proporciona balanceo de carga, terminación SSL y routing basado
+# en nombre de host o path.
+# REQUISITO: Necesita un Ingress Controller (nginx, traefik, etc.)
+# ============================================================================
+
+# Versión de la API
+apiVersion: networking.k8s.io/v1
+
+# Tipo de recurso
+kind: Ingress
+
+# ============================================================================
+# METADATA: Información de identificación del Ingress
+# ============================================================================
+metadata:
+  # Nombre único del Ingress
+  name: mi-ingress
+  
+  # Namespace
+  namespace: default
+  
+  # Labels
+  labels:
+    app: mi-aplicacion
+    environment: production
+    tier: frontend
+  
+  # ========================================================================
+  # ANNOTATIONS: Configuración específica del Ingress Controller
+  # ========================================================================
+  annotations:
+    # Descripción
+    description: "Ingress principal para la aplicación"
+    contact: "devops@empresa.com"
+    
+    # ====================================================================
+    # ANNOTATIONS COMUNES (NGINX Ingress Controller)
+    # ====================================================================
+    
+    # Clase de Ingress Controller a usar
+    # kubernetes.io/ingress.class: "nginx"  # Legacy, usar spec.ingressClassName
+    
+    # Reescritura de paths
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    
+    # Configuración SSL/TLS
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Certificado SSL personalizado
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: http01
+    
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://example.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-max-age: "3600"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # Buffer sizes
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    
+    # Session affinity (sticky sessions)
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"
+    
+    # Autenticación básica
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required'
+    
+    # Whitelist de IPs
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12"
+    
+    # Custom headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Custom-Header: CustomValue";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+    
+    # Redirecciones
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://example.com/new-path"
+    nginx.ingress.kubernetes.io/temporal-redirect: "https://example.com/temp-path"
+    
+    # Backend protocol
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"  # HTTP, HTTPS, GRPC, GRPCS
+    
+    # Configuración de websockets
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    
+    # ====================================================================
+    # ANNOTATIONS PARA TRAEFIK
+    # ====================================================================
+    # traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    # traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+    
+    # ====================================================================
+    # ANNOTATIONS PARA AWS ALB
+    # ====================================================================
+    # alb.ingress.kubernetes.io/scheme: internet-facing
+    # alb.ingress.kubernetes.io/target-type: ip
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789:certificate/abc
+    # alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    # alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    
+    # ====================================================================
+    # ANNOTATIONS PARA GCE
+    # ====================================================================
+    # kubernetes.io/ingress.global-static-ip-name: "web-static-ip"
+    # networking.gke.io/managed-certificates: "managed-cert"
+    # kubernetes.io/ingress.allow-http: "false"
+
+# ============================================================================
+# SPEC: Especificación del Ingress
+# ============================================================================
+spec:
+  # ========================================================================
+  # INGRESS CLASS NAME: Especifica qué Ingress Controller usar
+  # ========================================================================
+  # Reemplaza la annotation kubernetes.io/ingress.class
+  ingressClassName: nginx
+  
+  # ========================================================================
+  # DEFAULT BACKEND: Backend por defecto para rutas no coincidentes
+  # ========================================================================
+  # Se usa cuando ninguna regla coincide con la petición
+  defaultBackend:
+    service:
+      name: default-backend-service
+      port:
+        number: 80
+  
+  # ========================================================================
+  # TLS: Configuración de certificados SSL/TLS
+  # ========================================================================
+  tls:
+  # Primer certificado TLS
+  - hosts:
+    - example.com
+    - www.example.com
+    secretName: example-com-tls
+  
+  # Segundo certificado para otro dominio
+  - hosts:
+    - api.example.com
+    secretName: api-example-com-tls
+  
+  # Wildcard certificate
+  - hosts:
+    - "*.example.com"
+    secretName: wildcard-example-com-tls
+  
+  # ========================================================================
+  # RULES: Reglas de routing
+  # ========================================================================
+  rules:
+  # ====================================================================
+  # REGLA 1: Routing para dominio principal
+  # ====================================================================
+  - host: example.com
+    http:
+      paths:
+      # Path raíz
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+      
+      # API backend
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: api-service
+            port:
+              number: 8080
+      
+      # Path exacto
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: health-service
+            port:
+              name: http
+      
+      # Admin panel
+      - path: /admin
+        pathType: Prefix
+        backend:
+          service:
+            name: admin-service
+            port:
+              number: 3000
+  
+  # ====================================================================
+  # REGLA 2: Routing para subdominio API
+  # ====================================================================
+  - host: api.example.com
+    http:
+      paths:
+      # API v1
+      - path: /v1
+        pathType: Prefix
+        backend:
+          service:
+            name: api-v1-service
+            port:
+              number: 8080
+      
+      # API v2
+      - path: /v2
+        pathType: Prefix
+        backend:
+          service:
+            name: api-v2-service
+            port:
+              number: 8080
+      
+      # GraphQL
+      - path: /graphql
+        pathType: Exact
+        backend:
+          service:
+            name: graphql-service
+            port:
+              number: 4000
+  
+  # ====================================================================
+  # REGLA 3: Routing para subdominio de aplicación
+  # ====================================================================
+  - host: app.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: webapp-service
+            port:
+              number: 3000
+  
+  # ====================================================================
+  # REGLA 4: Routing sin host (cualquier dominio)
+  # ====================================================================
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: default-service
+            port:
+              number: 80
+
+# ============================================================================
+# PATH TYPES EXPLICADOS
+# ============================================================================
+# - Prefix: Coincide con el path especificado y cualquier subpath
+#   Ejemplo: /api coincide con /api, /api/users, /api/v1/users
+#
+# - Exact: Coincide exactamente con el path especificado
+#   Ejemplo: /api coincide solo con /api, no con /api/users
+#
+# - ImplementationSpecific: Depende de la implementación del Ingress Controller
+#   Comportamiento varía según el controller usado
+
+---
+# ============================================================================
+# EJEMPLO 1: INGRESS SIMPLE CON UN SERVICIO
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: simple-ingress
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: myapp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: myapp-service
+            port:
+              number: 80
+
+---
+# ============================================================================
+# EJEMPLO 2: INGRESS CON TLS/HTTPS
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tls-ingress
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - secure.example.com
+    secretName: secure-example-tls
+  rules:
+  - host: secure.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: secure-service
+            port:
+              number: 443
+
+---
+# ============================================================================
+# EJEMPLO 3: INGRESS CON MÚLTIPLES HOSTS Y PATHS
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: multi-host-ingress
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+  # Frontend
+  - host: www.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+  
+  # API
+  - host: api.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api
+            port:
+              number: 8080
+  
+  # Docs
+  - host: docs.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: documentation
+            port:
+              number: 3000
+
+---
+# ============================================================================
+# EJEMPLO 4: INGRESS CON PATH ROUTING
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: path-routing-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: example.com
+    http:
+      paths:
+      # Frontend
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+      
+      # API con rewrite
+      - path: /api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: api
+            port:
+              number: 8080
+      
+      # Static files
+      - path: /static
+        pathType: Prefix
+        backend:
+          service:
+            name: static-files
+            port:
+              number: 80
+
+---
+# ============================================================================
+# EJEMPLO 5: INGRESS CON AUTENTICACIÓN BÁSICA
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: auth-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - Admin Area'
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: admin.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: admin-panel
+            port:
+              number: 80
+
+---
+# ============================================================================
+# EJEMPLO 6: INGRESS CON RATE LIMITING
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rate-limited-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-connections: "5"
+    nginx.ingress.kubernetes.io/limit-rpm: "100"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: api.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-service
+            port:
+              number: 8080
+
+---
+# ============================================================================
+# EJEMPLO 7: INGRESS CON STICKY SESSIONS
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sticky-session-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "sticky-session"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "Strict"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stateful-app
+            port:
+              number: 8080
+
+---
+# ============================================================================
+# EJEMPLO 8: INGRESS CON WEBSOCKETS
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: websocket-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "websocket-service"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ws.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: websocket-service
+            port:
+              number: 8080
+
+---
+# ============================================================================
+# EJEMPLO 9: INGRESS CON GRPC
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grpc-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - grpc.example.com
+    secretName: grpc-example-tls
+  rules:
+  - host: grpc.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grpc-service
+            port:
+              number: 50051
+
+---
+# ============================================================================
+# EJEMPLO 10: INGRESS CON CANARY DEPLOYMENT
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: production-ingress
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: production-service
+            port:
+              number: 80
+---
+# Canary Ingress (10% del tráfico)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canary-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "10"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: canary-service
+            port:
+              number: 80
+
+# ============================================================================
+# COMANDOS ÚTILES PARA INGRESS
+# ============================================================================
+# Ver Ingresses:
+# kubectl get ingress
+
+# Ver detalles de un Ingress:
+# kubectl describe ingress mi-ingress
+
+# Ver Ingress con direcciones:
+# kubectl get ingress -o wide
+
+# Crear Ingress desde YAML:
+# kubectl apply -f ingress.yaml
+
+# Editar Ingress:
+# kubectl edit ingress mi-ingress
+
+# Eliminar Ingress:
+# kubectl delete ingress mi-ingress
+
+# Ver logs del Ingress Controller (NGINX):
+# kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
+
+# Ver IngressClasses disponibles:
+# kubectl get ingressclass
+
+# ============================================================================
+# NOTAS IMPORTANTES SOBRE INGRESS
+# ============================================================================
+# 1. INGRESS CONTROLLER:
+#    - Ingress solo es una especificación
+#    - Necesita un Ingress Controller para funcionar
+#    - Opciones populares: NGINX, Traefik, HAProxy, Kong, AWS ALB, GCE
+#
+# 2. INGRESS CLASS:
+#    - Permite múltiples Ingress Controllers en un cluster
+#    - Especifica qué controller gestiona cada Ingress
+#    - Reemplaza la annotation kubernetes.io/ingress.class
+#
+# 3. TLS/SSL:
+#    - Certificates deben estar en Secrets tipo kubernetes.io/tls
+#    - Usar cert-manager para certificados automáticos (Let's Encrypt)
+#    - Soporta SNI (Server Name Indication) para múltiples certificados
+#
+# 4. PATH TYPES:
+#    - Prefix: más común, coincide con subpaths
+#    - Exact: coincidencia exacta del path
+#    - ImplementationSpecific: depende del controller
+#
+# 5. ANNOTATIONS:
+#    - Específicas de cada Ingress Controller
+#    - NGINX: nginx.ingress.kubernetes.io/*
+#    - Traefik: traefik.ingress.kubernetes.io/*
+#    - AWS ALB: alb.ingress.kubernetes.io/*
+#    - Consultar documentación del controller usado
+#
+# 6. DEFAULT BACKEND:
+#    - Maneja peticiones que no coinciden con ninguna regla
+#    - Típicamente muestra página 404 personalizada
+#
+# 7. HOST ROUTING:
+#    - Routing basado en nombre de host (virtual hosting)
+#    - Soporta wildcards (*.example.com)
+#    - Sin host definido: acepta cualquier host
+#
+# 8. PATH ROUTING:
+#    - Routing basado en path de la URL
+#    - Orden importa: más específico primero
+#    - Usar rewrite-target para modificar paths
+#
+# 9. SEGURIDAD:
+#    - Habilitar SSL/TLS siempre que sea posible
+#    - Configurar CORS apropiadamente
+#    - Implementar rate limiting
+#    - Usar whitelist de IPs para áreas sensibles
+#    - Considerar WAF (Web Application Firewall)
+#
+# 10. PERFORMANCE:
+#     - Configurar buffers y timeouts apropiados
+#     - Usar sticky sessions para aplicaciones stateful
+#     - Implementar caching cuando sea posible
+#     - Habilitar compresión gzip
+#
+# 11. MONITOREO:
+#     - Ver logs del Ingress Controller
+#     - Monitorear métricas (requests, latency, errors)
+#     - Configurar alertas para problemas
+#     - Usar herramientas como Prometheus + Grafana
+#
+# 12. LIMITACIONES:
+#     - Ingress solo maneja HTTP/HTTPS
+#     - Para TCP/UDP, usar Gateway API o Services tipo LoadBalancer
+#     - Algunas features son específicas del controller
+
+# ============================================================================
+# FIN DEL INGRESS
+# ============================================================================

@@ -1,0 +1,476 @@
+# ============================================================================
+# REPLICASET DE KUBERNETES - EJEMPLO COMPLETO CON TODOS LOS APARTADOS
+# ============================================================================
+# Un ReplicaSet asegura que un número específico de réplicas de Pods estén
+# ejecutándose en todo momento. Generalmente se usa a través de Deployments.
+# ============================================================================
+
+# Versión de la API
+apiVersion: apps/v1
+
+# Tipo de recurso
+kind: ReplicaSet
+
+# ============================================================================
+# METADATA: Información de identificación del ReplicaSet
+# ============================================================================
+metadata:
+  # Nombre único del ReplicaSet
+  name: mi-replicaset
+  
+  # Namespace
+  namespace: default
+  
+  # Labels del ReplicaSet
+  labels:
+    app: mi-aplicacion
+    version: v1
+    tier: backend
+    managed-by: manual
+  
+  # Annotations
+  annotations:
+    description: "ReplicaSet para mantener 3 réplicas de la aplicación"
+    contact: "devops@empresa.com"
+    kubernetes.io/change-cause: "Versión inicial del ReplicaSet"
+
+# ============================================================================
+# SPEC: Especificación del ReplicaSet
+# ============================================================================
+spec:
+  # ========================================================================
+  # RÉPLICAS: Número deseado de Pods
+  # ========================================================================
+  # Define cuántos Pods deben estar ejecutándose simultáneamente
+  replicas: 3
+  
+  # ========================================================================
+  # SELECTOR: Define qué Pods gestiona este ReplicaSet
+  # ========================================================================
+  # CRÍTICO: El selector debe coincidir con las labels del template de Pods
+  selector:
+    # MatchLabels: selección exacta de labels
+    matchLabels:
+      app: mi-aplicacion
+      version: v1
+    
+    # MatchExpressions: selección con expresiones más complejas
+    matchExpressions:
+    - key: tier
+      operator: In  # Operadores: In, NotIn, Exists, DoesNotExist
+      values:
+      - backend
+      - frontend
+    - key: environment
+      operator: NotIn
+      values:
+      - testing
+  
+  # ========================================================================
+  # MINIMUM READY SECONDS
+  # ========================================================================
+  # Segundos mínimos que un Pod debe estar Ready antes de considerarse disponible
+  # Útil para asegurar que la aplicación está estable antes de continuar
+  minReadySeconds: 10
+  
+  # ========================================================================
+  # TEMPLATE: Plantilla para crear los Pods
+  # ========================================================================
+  # Define cómo serán los Pods que el ReplicaSet creará
+  template:
+    # Metadata de los Pods
+    metadata:
+      # Labels de los Pods - DEBEN coincidir con el selector
+      labels:
+        app: mi-aplicacion
+        version: v1
+        tier: backend
+        environment: production
+      
+      # Annotations específicas de los Pods
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    
+    # Especificación de los Pods
+    spec:
+      # ==================================================================
+      # CONTENEDORES
+      # ==================================================================
+      containers:
+      - name: aplicacion
+        image: nginx:1.21-alpine
+        imagePullPolicy: IfNotPresent
+        
+        # Puertos
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        
+        # Variables de entorno
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        
+        # Variables desde ConfigMap
+        - name: APP_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: config.json
+        
+        # Variables desde Secret
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secrets
+              key: password
+        
+        # Recursos
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+            ephemeral-storage: "1Gi"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+            ephemeral-storage: "2Gi"
+        
+        # Liveness Probe
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Readiness Probe
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Startup Probe
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: 80
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 30
+        
+        # Lifecycle hooks
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "echo 'Container started' > /tmp/startup.log"]
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+        
+        # Volúmenes
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: cache
+          mountPath: /cache
+        
+        # Contexto de seguridad
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 3000
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_BIND_SERVICE
+          seccompProfile:
+            type: RuntimeDefault
+      
+      # Contenedor sidecar para métricas
+      - name: metrics-exporter
+        image: prom/node-exporter:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: metrics
+          containerPort: 9100
+          protocol: TCP
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      
+      # ==================================================================
+      # INIT CONTAINERS
+      # ==================================================================
+      initContainers:
+      - name: init-wait-for-db
+        image: busybox:1.35
+        command:
+        - 'sh'
+        - '-c'
+        - 'until nc -z database-service 5432; do echo waiting for database; sleep 2; done'
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "50m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+      
+      - name: init-setup
+        image: busybox:1.35
+        command:
+        - 'sh'
+        - '-c'
+        - 'mkdir -p /data/logs && chmod 755 /data/logs'
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      
+      # ==================================================================
+      # VOLÚMENES
+      # ==================================================================
+      volumes:
+      # Volumen vacío para datos temporales
+      - name: data
+        emptyDir: {}
+      
+      # Volumen en memoria para caché
+      - name: cache
+        emptyDir:
+          medium: Memory
+          sizeLimit: 128Mi
+      
+      # Volumen desde ConfigMap
+      - name: config
+        configMap:
+          name: app-config
+          defaultMode: 0644
+          items:
+          - key: app.conf
+            path: application.conf
+      
+      # Volumen desde Secret
+      - name: secrets
+        secret:
+          secretName: app-secrets
+          defaultMode: 0400
+      
+      # Volumen persistente
+      - name: persistent-data
+        persistentVolumeClaim:
+          claimName: app-pvc
+      
+      # ==================================================================
+      # CONFIGURACIÓN DE RED
+      # ==================================================================
+      dnsPolicy: ClusterFirst
+      
+      dnsConfig:
+        nameservers:
+        - 8.8.8.8
+        searches:
+        - default.svc.cluster.local
+        options:
+        - name: ndots
+          value: "2"
+      
+      hostname: mi-pod
+      subdomain: mi-subdomain
+      
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+      
+      # ==================================================================
+      # SERVICE ACCOUNT Y SEGURIDAD
+      # ==================================================================
+      serviceAccountName: app-service-account
+      automountServiceAccountToken: true
+      
+      securityContext:
+        fsGroup: 2000
+        fsGroupChangePolicy: "OnRootMismatch"
+        supplementalGroups: [3000]
+        runAsUser: 1000
+        runAsGroup: 3000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+        sysctls:
+        - name: net.core.somaxconn
+          value: "1024"
+      
+      # ==================================================================
+      # SCHEDULING
+      # ==================================================================
+      
+      # Selector de nodos
+      nodeSelector:
+        disktype: ssd
+        node-role: worker
+      
+      # Afinidad
+      affinity:
+        # Node Affinity
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/zone
+                operator: In
+                values:
+                - us-east-1a
+                - us-east-1b
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - compute-optimized
+        
+        # Pod Anti-Affinity para distribuir réplicas
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: mi-aplicacion
+              topologyKey: kubernetes.io/hostname
+      
+      # Tolerations
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 300
+      - key: "dedicated"
+        operator: "Equal"
+        value: "app"
+        effect: "NoSchedule"
+      
+      # Prioridad
+      priorityClassName: medium-priority
+      
+      # Distribución de topología
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: mi-aplicacion
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: mi-aplicacion
+      
+      # ==================================================================
+      # POLÍTICAS
+      # ==================================================================
+      
+      # Política de reinicio
+      restartPolicy: Always
+      
+      # Tiempo de gracia para terminación
+      terminationGracePeriodSeconds: 30
+      
+      # Deadline activo
+      activeDeadlineSeconds: 7200
+      
+      # Política de preempción
+      preemptionPolicy: PreemptLowerPriority
+      
+      # ==================================================================
+      # RUNTIME
+      # ==================================================================
+      runtimeClassName: runc
+      
+      overhead:
+        memory: "20Mi"
+        cpu: "10m"
+      
+      # ==================================================================
+      # OTRAS CONFIGURACIONES
+      # ==================================================================
+      imagePullSecrets:
+      - name: registry-credentials
+      
+      enableServiceLinks: true
+      shareProcessNamespace: false
+      setHostnameAsFQDN: false
+      
+      os:
+        name: linux
+      
+      readinessGates:
+      - conditionType: "example.com/app-ready"
+
+# ============================================================================
+# STATUS: Estado del ReplicaSet (solo lectura, gestionado por Kubernetes)
+# ============================================================================
+# status:
+#   replicas: 3                  # Número actual de réplicas
+#   fullyLabeledReplicas: 3      # Réplicas con las labels correctas
+#   readyReplicas: 3             # Réplicas listas
+#   availableReplicas: 3         # Réplicas disponibles
+#   observedGeneration: 1        # Generación observada
+#   conditions:
+#   - type: ReplicaFailure
+#     status: "False"
+#     lastTransitionTime: 2025-10-27T10:00:00Z
+
+# ============================================================================
+# NOTAS IMPORTANTES SOBRE REPLICASET
+# ============================================================================
+# 1. En producción, normalmente NO se crean ReplicaSets directamente
+# 2. Se crean automáticamente por Deployments
+# 3. Los Deployments ofrecen actualizaciones declarativas y rollback
+# 4. Usar ReplicaSets directamente solo en casos muy específicos
+# 5. El selector debe coincidir exactamente con las labels del template
+# 6. No se puede cambiar el selector después de crear el ReplicaSet
+# 7. Los Pods existentes no son adoptados automáticamente
+
+# ============================================================================
+# FIN DEL REPLICASET
+# ============================================================================
